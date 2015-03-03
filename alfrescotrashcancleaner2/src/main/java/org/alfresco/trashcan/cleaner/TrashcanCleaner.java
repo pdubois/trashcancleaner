@@ -128,6 +128,9 @@ public class TrashcanCleaner
 
                         List<NodeRef> pageElements = results.getPage();
 
+                        if (pageElements.size() == 0)
+                            return false;
+
                         Date toDate = new Date(new Date().getTime() - (1000L * 60L * 60L * 24L * protectedDays));
 
                         // display the page
@@ -141,18 +144,18 @@ public class TrashcanCleaner
                             String name = (String) nodeService.getProperty(nodeRef, ContentModel.PROP_NAME);
                             if (logger.isDebugEnabled())
                             {
-                                logger.debug("Delete NodeRef :" + nodeRef + " $ Name :" + name + " $ archivedDate :" + archivedDate);
+                                logger.debug("Delete NodeRef :" + nodeRef + " $ Name :" + name + " $ archivedDate :"
+                                        + archivedDate);
                             }
                             nodeService.deleteNode(nodeRef);
 
                         }
 
-
                         return true;
                     }
                 };
             Boolean doMore;
-            
+
             int iteration = 1;
             do
             {
