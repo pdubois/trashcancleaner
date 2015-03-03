@@ -32,7 +32,7 @@
         <property name="nodeLocatorService" ref="nodeLocatorService" />
     </bean>
     
-        <bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
+    <bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
         <property name="nodeService">
             <ref bean="nodeService" />
         </property>
@@ -48,6 +48,7 @@
         <property name="cannedQueryRegistry">
             <ref bean="fileFolderCannedQueryRegistry" />
         </property>
+        <property name="jobLockService" ref="JobLockService"/>
     </bean>
 
     <bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">

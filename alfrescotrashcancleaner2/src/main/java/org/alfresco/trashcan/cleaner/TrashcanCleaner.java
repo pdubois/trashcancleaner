@@ -5,17 +5,22 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.alfresco.model.ContentModel;
 import org.alfresco.query.CannedQueryFactory;
 import org.alfresco.query.CannedQueryResults;
 import org.alfresco.query.PagingRequest;
+import org.alfresco.repo.lock.JobLockService;
+import org.alfresco.repo.lock.JobLockService.JobLockRefreshCallback;
+import org.alfresco.repo.lock.LockAcquisitionException;
 import org.alfresco.repo.model.filefolder.GetChildrenCannedQueryFactory;
 import org.alfresco.repo.node.getchildren.GetChildrenCannedQuery;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
 import org.alfresco.service.cmr.repository.NodeRef;
 import org.alfresco.service.cmr.repository.NodeService;
 import org.alfresco.service.cmr.repository.StoreRef;
+import org.alfresco.service.namespace.NamespaceService;
 import org.alfresco.service.namespace.QName;
 import org.alfresco.service.transaction.TransactionService;
 import org.alfresco.util.Pair;
@@ -25,11 +30,21 @@ import org.apache.commons.logging.LogFactory;
 
 public class TrashcanCleaner
 {
+    private static final long LOCK_TTL = 30000L; // 30 sec
+    private static final QName LOCK_QNAME = QName.createQName(NamespaceService.SYSTEM_MODEL_1_0_URI,
+            "org.alfresco.repo.activities.feed.cleanup.FeedCleaner");
     private static final String CANNED_QUERY_FILEFOLDER_LIST = "fileFolderGetChildrenCannedQueryFactory";
     private static Log logger = LogFactory.getLog(TrashcanCleaner.class);
 
     private NodeService nodeService;
     private TransactionService transactionService;
+    private JobLockService jobLockService;
+
+    public void setJobLockService(JobLockService jobLockService)
+    {
+        this.jobLockService = jobLockService;
+    }
+
     private int protectedDays = 7;
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
@@ -154,19 +169,62 @@ public class TrashcanCleaner
                         return true;
                     }
                 };
-            Boolean doMore;
 
-            int iteration = 1;
-            do
+            final AtomicBoolean keepGoing = new AtomicBoolean(true);
+            Boolean doMore = false;
+            String lockToken = null;
+            try
+            {
+                // Lock
+                lockToken = jobLockService.getLock(LOCK_QNAME, LOCK_TTL);
+                // Refresh to get callbacks
+                JobLockRefreshCallback callback = new JobLockRefreshCallback()
+                    {
+                        @Override
+                        public void lockReleased()
+                        {
+                            keepGoing.set(false);
+                        }
+
+                        @Override
+                        public boolean isActive()
+                        {
+                            return keepGoing.get();
+                        }
+                    }; 
+                jobLockService.refreshLock(lockToken, LOCK_QNAME, LOCK_TTL, callback);
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("Lock acquired in TrashcanCleaner");
+                }
+
+                int iteration = 1;
+                do
+                {
+                    if (logger.isDebugEnabled())
+                    {
+                        logger.debug("iteration =" + iteration);
+                    }
+                    iteration++;
+                    doMore = transactionService.getRetryingTransactionHelper().doInTransaction(pagingWork, false, true);
+                }
+                while (doMore == true);
+            }
+            catch (LockAcquisitionException e)
             {
                 if (logger.isDebugEnabled())
                 {
-                    logger.debug("iteration =" + iteration);
+                    logger.debug("Skipping TrashCanCleaner  " + e.getMessage());
                 }
-                iteration++;
-                doMore = transactionService.getRetryingTransactionHelper().doInTransaction(pagingWork, false, true);
             }
-            while (doMore == true);
+            finally
+            {
+                keepGoing.set(false); // Notify the refresh callback that we are done
+                if (lockToken != null)
+                {
+                    jobLockService.releaseLock(lockToken, LOCK_QNAME);
+                }
+            }
 
         }
     }
