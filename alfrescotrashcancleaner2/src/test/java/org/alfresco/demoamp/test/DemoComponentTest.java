@@ -61,7 +61,6 @@ public class DemoComponentTest
 
     private static final String ADMIN_USER_NAME = "admin";
     private static final int NODE_CREATION_BATCH_SIZE = 99;
-    
 
     static Logger log = Logger.getLogger(DemoComponentTest.class);
 
@@ -71,7 +70,7 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("NodeService")
     protected NodeService nodeService;
-    
+
     @Autowired
     @Qualifier("policyBehaviourFilter")
     protected BehaviourFilter policyBehaviourFilter;
@@ -79,7 +78,7 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("ServiceRegistry")
     ServiceRegistry serviceRegistry;
-    
+
     @Autowired
     @Qualifier("trashcanCleaner")
     TrashcanCleaner trashcanCleaner;
@@ -120,6 +119,61 @@ public class DemoComponentTest
         InsureBinEmpty();
         assertTrue(true);
         PopulateBin();
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    // test if purge deleted all the elements from the bing
+                    trashcanCleaner.execute();
+                    childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    assertEquals(childAssocs.size(), 90);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+
+    @Test
+    public void testPurgeBinPageSize()
+    {
+        assertNotNull(serviceRegistry);
+        List<Integer> pageLens = new ArrayList<Integer>(5);
+        pageLens.add(1);
+        pageLens.add(5);
+        pageLens.add(7);
+        pageLens.add(10);
+        pageLens.add(13);
+        for (int pl : pageLens)
+        {
+            // empty the bin
+            InsureBinEmpty();
+            assertTrue(true);
+            trashcanCleaner.setPageLen(pl);
+            PopulateBin();
+            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+                {
+                    public Object doWork() throws Exception
+                    {
+                        // try to count number of elements in the bin
+                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        // test if purge deleted all the elements from the bing
+                        trashcanCleaner.execute();
+                        childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        assertEquals(childAssocs.size(), 90);
+                        return null;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+        }
 
     }
 
@@ -240,76 +294,55 @@ public class DemoComponentTest
 
                 }
             }, AuthenticationUtil.getSystemUserName());
-        
-        //modify the {http://www.alfresco.org/model/system/1.0}archivedDate or sys:archivedDate
-        
+
+        // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or sys:archivedDate
+
         final RetryingTransactionCallback<List<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<List<NodeRef>>()
+            {
+                public List<NodeRef> execute() throws Exception
                 {
-                    public List<NodeRef> execute() throws Exception
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    int i = 0;
+                    for (ChildAssociationRef childAssoc : childAssocs)
                     {
-                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
-                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-                        int i = 0;
-                        for (ChildAssociationRef childAssoc : childAssocs)
+                        if (i > 10)
+                            break;
+                        i++;
+                        Calendar cal = Calendar.getInstance();
+                        cal.set(Calendar.YEAR, 1974);
+                        cal.set(Calendar.MONTH, 4);
+                        cal.set(Calendar.DAY_OF_MONTH, 28);
+                        cal.set(Calendar.HOUR_OF_DAY, 17);
+                        cal.set(Calendar.MINUTE, 30);
+                        cal.set(Calendar.SECOND, 0);
+                        cal.set(Calendar.MILLISECOND, 0);
+
+                        Date d = cal.getTime();
+                        policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                        try
                         {
-                            if (i > 10)
-                                break;
-                            i++;
-                            Calendar cal = Calendar.getInstance();
-                            cal.set(Calendar.YEAR, 1974);
-                            cal.set(Calendar.MONTH, 4);
-                            cal.set(Calendar.DAY_OF_MONTH, 28);
-                            cal.set(Calendar.HOUR_OF_DAY,17);
-                            cal.set(Calendar.MINUTE,30);
-                            cal.set(Calendar.SECOND,0);
-                            cal.set(Calendar.MILLISECOND,0);
-
-                            Date d = cal.getTime();
-                            policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                            try {
-                                nodeService.setProperty(childAssoc.getChildRef(),ContentModel.PROP_ARCHIVED_DATE,d);                               
-                            }
-                            finally
-                            {
-                                policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                            }
-
-                            
+                            nodeService.setProperty(childAssoc.getChildRef(), ContentModel.PROP_ARCHIVED_DATE, d);
+                        }
+                        finally
+                        {
+                            policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
                         }
 
-                        return null;
                     }
-                };
-            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+
+                    return null;
+                }
+            };
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
                 {
-                    public Object doWork() throws Exception
-                    {
-                        return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(getArchivedNodeDateOffseted);
-                    }
-                }, AuthenticationUtil.getSystemUserName());
-            
-            
-            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-                    {
-                        public Object doWork() throws Exception
-                        {
-                            // try to count number of elements in the bin
-                            StoreRef storeRef = new StoreRef("archive://SpacesStore");
-                            NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                            List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-                            
-                            //test if purge deleted all the elements from the bing
-                            trashcanCleaner.execute();
-                            childAssocs = nodeService.getChildAssocs(archiveRoot);
-                                
-                            assertEquals(childAssocs.size(), 90);
-                            return null;
-                        }
-                    }, AuthenticationUtil.getSystemUserName());
-
-            
-
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                            getArchivedNodeDateOffseted);
+                }
+            }, AuthenticationUtil.getSystemUserName());
 
     }
 

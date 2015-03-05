@@ -50,6 +50,11 @@ public class TrashcanCleaner
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
     private int pageLen = 3;
 
+    public void setPageLen(int pageLen)
+    {
+        this.pageLen = pageLen;
+    }
+
     /**
      * Set the registry of {@link CannedQueryFactory canned queries}
      */
