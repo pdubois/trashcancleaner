@@ -103,6 +103,7 @@ public class TrashcanCleaner
         if (logger.isDebugEnabled())
         {
             logger.debug("Execute called!!!!");
+            logger.debug("Trashcancleaner protectedDays days=" + protectedDays);
         }
         if (this.protectedDays > 0)
         {
