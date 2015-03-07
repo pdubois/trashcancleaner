@@ -19,6 +19,7 @@ import org.alfresco.repo.policy.BehaviourFilter;
 import org.alfresco.repo.security.authentication.AuthenticationUtil;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
 import org.alfresco.service.ServiceRegistry;
+import org.alfresco.service.cmr.model.FileFolderService;
 import org.alfresco.service.cmr.repository.ChildAssociationRef;
 import org.alfresco.service.cmr.repository.ContentService;
 import org.alfresco.service.cmr.repository.ContentWriter;
@@ -82,6 +83,10 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("trashcanCleaner")
     TrashcanCleaner trashcanCleaner;
+    
+    @Autowired
+    @Qualifier("FileFolderService")
+    FileFolderService fileFolderService;
 
     @Test
     public void testWiring()
@@ -117,8 +122,7 @@ public class DemoComponentTest
         assertNotNull(serviceRegistry);
         // empty the bin
         InsureBinEmpty();
-        assertTrue(true);
-        PopulateBin();
+        PopulateBin(null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -140,6 +144,54 @@ public class DemoComponentTest
     }
 
     @Test
+    public void testPurgeBinWithSecondaryParents()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
+            {
+                public NodeRef doWork() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                    NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                            RegexQNamePattern.MATCH_ALL,
+                            QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
+
+                    NodeRef companyHome = list.get(0).getChildRef();
+                    NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS, "SecondaryParent");
+                    if (secParent == null)
+                    {
+                      secParent = fileFolderService.create(companyHome,"SecondaryParent", ContentModel.TYPE_FOLDER).getNodeRef();
+                    }
+                    return secParent;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+        PopulateBin(secParent);
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    // test if purge deleted all the elements from the bing
+                    trashcanCleaner.execute();
+                    childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    assertEquals(childAssocs.size(), 90);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+        // insure secParent is empty
+        int count = nodeService.countChildAssocs(secParent, false);
+        assertTrue(count == 0);
+    }
+
+    @Test
     public void testPurgeBinPageSize()
     {
         assertNotNull(serviceRegistry);
@@ -155,7 +207,7 @@ public class DemoComponentTest
             InsureBinEmpty();
             assertTrue(true);
             trashcanCleaner.setPageLen(pl);
-            PopulateBin();
+            PopulateBin(null);
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
                     public Object doWork() throws Exception
@@ -165,7 +217,7 @@ public class DemoComponentTest
                         NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                         List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                        // test if purge deleted all the elements from the bing
+                        // test if purge deleted all the elements from the bin
                         trashcanCleaner.execute();
                         childAssocs = nodeService.getChildAssocs(archiveRoot);
 
@@ -209,8 +261,9 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
     }
 
-    protected void PopulateBin()
+    protected void PopulateBin(NodeRef secondParent)
     {
+        final NodeRef fSecondParent = secondParent;
         // use TransactionWork to wrap service calls in a user transaction
         TransactionService transactionService = serviceRegistry.getTransactionService();
         final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
@@ -257,6 +310,11 @@ public class DemoComponentTest
                         writer.setEncoding("UTF-8");
                         String text = "The quick brown fox jumps over the lazy dog";
                         writer.putContent(text);
+                        if (fSecondParent != null)
+                        {
+                            nodeService.addChild(fSecondParent, content, ContentModel.ASSOC_CONTAINS,
+                                    QName.createQName(NamespaceService.CONTENT_MODEL_PREFIX, name));
+                        }
                         batchOfNodes.add(content);
                     }
                     return batchOfNodes;
@@ -345,5 +403,4 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
 
     }
-
 }
