@@ -32,7 +32,7 @@ public class TrashcanCleaner
 {
     private static final long LOCK_TTL = 30000L; // 30 sec
     private static final QName LOCK_QNAME = QName.createQName(NamespaceService.SYSTEM_MODEL_1_0_URI,
-            "org.alfresco.repo.activities.feed.cleanup.FeedCleaner");
+            "org.alfresco.repo.TrashcanCleaner");
     private static final String CANNED_QUERY_FILEFOLDER_LIST = "fileFolderGetChildrenCannedQueryFactory";
     private static Log logger = LogFactory.getLog(TrashcanCleaner.class);
 
