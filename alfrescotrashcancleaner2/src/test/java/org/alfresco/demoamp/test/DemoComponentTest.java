@@ -61,7 +61,9 @@ public class DemoComponentTest
 {
 
     private static final String ADMIN_USER_NAME = "admin";
-    private static final int NODE_CREATION_BATCH_SIZE = 99;
+    private static final int NODE_CREATION_BATCH_SIZE = 200;
+    private static final int NUM_OF_DELETED = 10;
+    private static final int NUM_REMAININGS = NODE_CREATION_BATCH_SIZE - NUM_OF_DELETED + 1;
 
     static Logger log = Logger.getLogger(DemoComponentTest.class);
 
@@ -136,7 +138,7 @@ public class DemoComponentTest
                     trashcanCleaner.execute();
                     childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                    assertEquals(childAssocs.size(), 90);
+                    assertEquals(childAssocs.size(), NUM_REMAININGS);
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -182,7 +184,7 @@ public class DemoComponentTest
                     trashcanCleaner.execute();
                     childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                    assertEquals(childAssocs.size(), 90);
+                    assertEquals(childAssocs.size(), NUM_REMAININGS);
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -221,7 +223,7 @@ public class DemoComponentTest
                         trashcanCleaner.execute();
                         childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                        assertEquals(childAssocs.size(), 90);
+                        assertEquals(childAssocs.size(), NUM_REMAININGS);
                         return null;
                     }
                 }, AuthenticationUtil.getSystemUserName());
@@ -365,7 +367,7 @@ public class DemoComponentTest
                     int i = 0;
                     for (ChildAssociationRef childAssoc : childAssocs)
                     {
-                        if (i > 10)
+                        if (i > NUM_OF_DELETED)
                             break;
                         i++;
                         Calendar cal = Calendar.getInstance();
