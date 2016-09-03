@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.alfresco.demoamp.DemoComponent;
 import org.alfresco.model.ContentModel;
 import org.alfresco.repo.content.MimetypeMap;
 import org.alfresco.repo.policy.BehaviourFilter;
@@ -20,6 +19,7 @@ import org.alfresco.repo.security.authentication.AuthenticationUtil;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
 import org.alfresco.service.ServiceRegistry;
 import org.alfresco.service.cmr.model.FileFolderService;
+import org.alfresco.service.cmr.model.FileInfo;
 import org.alfresco.service.cmr.repository.ChildAssociationRef;
 import org.alfresco.service.cmr.repository.ContentService;
 import org.alfresco.service.cmr.repository.ContentWriter;
@@ -60,15 +60,11 @@ import com.tradeshift.test.remote.RemoteTestRunner;
 public class DemoComponentTest
 {
 
-    private static final String ADMIN_USER_NAME = "admin";
     private static final int NODE_CREATION_BATCH_SIZE = 200;
     private static final int NUM_OF_DELETED = 10;
     private static final int NUM_REMAININGS = NODE_CREATION_BATCH_SIZE - NUM_OF_DELETED + 1;
 
     static Logger log = Logger.getLogger(DemoComponentTest.class);
-
-    @Autowired
-    protected DemoComponent demoComponent;
 
     @Autowired
     @Qualifier("NodeService")
@@ -85,38 +81,10 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("trashcanCleaner")
     TrashcanCleaner trashcanCleaner;
-    
+
     @Autowired
     @Qualifier("FileFolderService")
     FileFolderService fileFolderService;
-
-    @Test
-    public void testWiring()
-    {
-        assertNotNull(demoComponent);
-    }
-
-    @Test
-    public void testGetCompanyHome()
-    {
-        AuthenticationUtil.setFullyAuthenticatedUser(ADMIN_USER_NAME);
-        NodeRef companyHome = demoComponent.getCompanyHome();
-        assertNotNull(companyHome);
-        String companyHomeName = (String) nodeService.getProperty(companyHome, ContentModel.PROP_NAME);
-        assertNotNull(companyHomeName);
-        assertEquals("Company Home", companyHomeName);
-    }
-
-    @Test
-    public void testChildNodesCount()
-    {
-        AuthenticationUtil.setFullyAuthenticatedUser(ADMIN_USER_NAME);
-        NodeRef companyHome = demoComponent.getCompanyHome();
-        int childNodeCount = demoComponent.childNodesCount(companyHome);
-        assertNotNull(childNodeCount);
-        // There are 7 folders by default under Company Home
-        assertTrue(true);
-    }
 
     @Test
     public void testPurgeBin()
@@ -125,6 +93,37 @@ public class DemoComponentTest
         // empty the bin
         InsureBinEmpty();
         PopulateBin(null);
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    // test if purge deleted all the elements from the bing
+                    trashcanCleaner.execute();
+                    childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    assertEquals(childAssocs.size(), NUM_REMAININGS);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+    
+    /**
+     * Test that it can cope with file folder structure.
+     * It chunks the final delete from bin in smaller pieces
+     */
+    @Test
+    public void testPurgeBinBigTree()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        PopulateBinWithBigTree(null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -162,10 +161,12 @@ public class DemoComponentTest
                             QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
 
                     NodeRef companyHome = list.get(0).getChildRef();
-                    NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS, "SecondaryParent");
+                    NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
+                            "SecondaryParent");
                     if (secParent == null)
                     {
-                      secParent = fileFolderService.create(companyHome,"SecondaryParent", ContentModel.TYPE_FOLDER).getNodeRef();
+                        secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
+                                .getNodeRef();
                     }
                     return secParent;
                 }
@@ -188,9 +189,19 @@ public class DemoComponentTest
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
-        // insure secParent is empty
-        int count = nodeService.countChildAssocs(secParent, false);
-        assertTrue(count == 0);
+
+        final NodeRef fSecParent = secParent;
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // insure secParent is empty
+                    int count = nodeService.countChildAssocs(fSecParent, false);
+                    assertTrue(count == 0);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
     }
 
     @Test
@@ -229,6 +240,187 @@ public class DemoComponentTest
                 }, AuthenticationUtil.getSystemUserName());
         }
 
+    }
+
+    protected void PopulateBinWithBigTree(NodeRef secondParent)
+    {
+        final NodeRef fSecondParent = secondParent;
+        // use TransactionWork to wrap service calls in a user transaction
+        TransactionService transactionService = serviceRegistry.getTransactionService();
+        final FileFolderService fileFolderService = serviceRegistry.getFileFolderService();
+        final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                    NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                            RegexQNamePattern.MATCH_ALL,
+                            QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
+
+                    NodeRef companyHome = list.get(0).getChildRef();
+
+                    List<NodeRef> batchOfNodes = new ArrayList<NodeRef>(NODE_CREATION_BATCH_SIZE);
+                    for (int i = 0; i < NODE_CREATION_BATCH_SIZE; i++)
+                    {
+                        if (i % 10 != 0)
+                        {
+                            // assign name
+                            String name = "Foundation API sample (" + System.currentTimeMillis() + ")";
+                            Map<QName, Serializable> contentProps = new HashMap<QName, Serializable>();
+                            contentProps.put(ContentModel.PROP_NAME, name);
+
+                            // create content node
+                            NodeService nodeService = serviceRegistry.getNodeService();
+                            ChildAssociationRef association = nodeService.createNode(companyHome,
+                                    ContentModel.ASSOC_CONTAINS,
+                                    QName.createQName(NamespaceService.CONTENT_MODEL_PREFIX, name),
+                                    ContentModel.TYPE_CONTENT, contentProps);
+                            NodeRef content = association.getChildRef();
+
+                            // add titled aspect (for Web Client display)
+                            Map<QName, Serializable> titledProps = new HashMap<QName, Serializable>();
+                            titledProps.put(ContentModel.PROP_TITLE, name);
+                            titledProps.put(ContentModel.PROP_DESCRIPTION, name);
+                            nodeService.addAspect(content, ContentModel.ASPECT_TITLED, titledProps);
+
+                            //
+                            // write some content to new node
+                            //
+                            ContentService contentService = serviceRegistry.getContentService();
+                            serviceRegistry.getContentService();
+                            ContentWriter writer = contentService.getWriter(content, ContentModel.PROP_CONTENT, true);
+                            writer.setMimetype(MimetypeMap.MIMETYPE_TEXT_PLAIN);
+                            writer.setEncoding("UTF-8");
+                            String text = "The quick brown fox jumps over the lazy dog";
+                            writer.putContent(text);
+                            if (fSecondParent != null)
+                            {
+                                nodeService.addChild(fSecondParent, content, ContentModel.ASSOC_CONTAINS,
+                                        QName.createQName(NamespaceService.CONTENT_MODEL_PREFIX, name));
+                            }
+                            batchOfNodes.add(content);
+                        }
+                        else
+                        {
+                            //create a tree of more than 500 file folders
+                            String name = "Foundation API sample (" + System.currentTimeMillis() + ")";
+                            FileInfo theRoot = fileFolderService.create(companyHome, name, ContentModel.TYPE_FOLDER);
+                            batchOfNodes.add(theRoot.getNodeRef());
+                            for(int j =1; j<700; j++)
+                            {
+                                name = "Foundation API sample (" + System.currentTimeMillis() + ")";
+                                if(j%10 == 0)
+                                {
+                                    FileInfo theNewRoot = fileFolderService.create(theRoot.getNodeRef(), name, ContentModel.TYPE_FOLDER); 
+                                    theRoot = theNewRoot;
+                                }
+                                else
+                                {
+                                    //create some content
+                                    fileFolderService.create(theRoot.getNodeRef(), name, ContentModel.TYPE_CONTENT);
+                                }
+                            }
+                        }
+                    }
+                    return batchOfNodes;
+                }
+            };
+        final TransactionService fTransactionService = transactionService;
+        final List<NodeRef> batchOfnodes = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<List<NodeRef>>()
+            {
+                public List<NodeRef> doWork() throws Exception
+                {
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                            populateBinWork);
+
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+        // delete the batch
+        final RetryingTransactionCallback<Object> deleteWork = new RetryingTransactionCallback<Object>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    for (NodeRef node : batchOfnodes)
+                    {
+                        nodeService.deleteNode(node);
+                    }
+
+                    return null;
+                }
+            };
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(deleteWork);
+
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+        // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or sys:archivedDate
+
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    offsetNodesInBin(fTransactionService);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+
+    protected void offsetNodesInBin(TransactionService transactionService)
+    {
+        final TransactionService fTransactionService = transactionService;
+        final RetryingTransactionCallback<List<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<List<NodeRef>>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    int i = 0;
+                    for (ChildAssociationRef childAssoc : childAssocs)
+                    {
+                        if (i > NUM_OF_DELETED)
+                            break;
+                        i++;
+                        Calendar cal = Calendar.getInstance();
+                        cal.set(Calendar.YEAR, 1974);
+                        cal.set(Calendar.MONTH, 4);
+                        cal.set(Calendar.DAY_OF_MONTH, 28);
+                        cal.set(Calendar.HOUR_OF_DAY, 17);
+                        cal.set(Calendar.MINUTE, 30);
+                        cal.set(Calendar.SECOND, 0);
+                        cal.set(Calendar.MILLISECOND, 0);
+
+                        Date d = cal.getTime();
+                        policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                        try
+                        {
+                            nodeService.setProperty(childAssoc.getChildRef(), ContentModel.PROP_ARCHIVED_DATE, d);
+                        }
+                        finally
+                        {
+                            policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                        }
+
+                    }
+
+                    return null;
+                }
+            };
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                            getArchivedNodeDateOffseted);
+                }
+            }, AuthenticationUtil.getSystemUserName());
     }
 
     protected void InsureBinEmpty()
@@ -357,50 +549,14 @@ public class DemoComponentTest
 
         // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or sys:archivedDate
 
-        final RetryingTransactionCallback<List<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<List<NodeRef>>()
-            {
-                public List<NodeRef> execute() throws Exception
-                {
-                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
-                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-                    int i = 0;
-                    for (ChildAssociationRef childAssoc : childAssocs)
-                    {
-                        if (i > NUM_OF_DELETED)
-                            break;
-                        i++;
-                        Calendar cal = Calendar.getInstance();
-                        cal.set(Calendar.YEAR, 1974);
-                        cal.set(Calendar.MONTH, 4);
-                        cal.set(Calendar.DAY_OF_MONTH, 28);
-                        cal.set(Calendar.HOUR_OF_DAY, 17);
-                        cal.set(Calendar.MINUTE, 30);
-                        cal.set(Calendar.SECOND, 0);
-                        cal.set(Calendar.MILLISECOND, 0);
-
-                        Date d = cal.getTime();
-                        policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                        try
-                        {
-                            nodeService.setProperty(childAssoc.getChildRef(), ContentModel.PROP_ARCHIVED_DATE, d);
-                        }
-                        finally
-                        {
-                            policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                        }
-
-                    }
-
-                    return null;
-                }
-            };
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
                 {
-                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            getArchivedNodeDateOffseted);
+                    // return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                    // getArchivedNodeDateOffseted);
+                    offsetNodesInBin(fTransactionService);
+                    return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
 
