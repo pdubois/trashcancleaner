@@ -48,7 +48,6 @@
         <property name="cannedQueryRegistry">
             <ref bean="fileFolderCannedQueryRegistry" />
         </property>
-        <property name="jobLockService" ref="JobLockService"/>
         <property name="pageLen" value="${trashcan.cleaner.pagelen}" />
     </bean>
 

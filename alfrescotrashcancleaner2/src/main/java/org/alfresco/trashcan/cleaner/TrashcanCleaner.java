@@ -39,12 +39,6 @@ public class TrashcanCleaner
 
     private NodeService nodeService;
     private TransactionService transactionService;
-    private JobLockService jobLockService;
-
-    public void setJobLockService(JobLockService jobLockService)
-    {
-        this.jobLockService = jobLockService;
-    }
 
     private int protectedDays = 7;
     private StoreRef storeRef;
@@ -169,115 +163,73 @@ public class TrashcanCleaner
                                 logger.debug("Delete NodeRef :" + nodeRef + " $ Name :" + name + " $ archivedDate :"
                                         + archivedDate);
                             }
-                            //Maybe there is more than one element to deleted there
-                            //It might be a big three and therefore causing  requiring big or even too big transaction
-                            
-                            while(deleteRecursive(nodeRef, 500) != 0);
+                            // Maybe there is more than one element to deleted there
+                            // It might be a big three and therefore causing requiring big or even too big transaction
+
+                            while (deleteRecursive(nodeRef, 500) != 0);
                         }
 
                         return true;
                     }
-                    
+
                     int deleteRecursive(NodeRef nodeRef, int maxNumOfNodesInTransaction)
                     {
                         final NodeRef fNodeREf = nodeRef;
                         final int fMaxNumOfNodesInTransaction = maxNumOfNodesInTransaction;
                         final RetryingTransactionCallback<Integer> recursiveWork = new RetryingTransactionCallback<Integer>()
+                            {
+                                public Integer execute() throws Exception
                                 {
-                                    public Integer execute() throws Exception
+                                    return this.deleteRecursiveInternal(fNodeREf, 500);
+                                }
+
+                                public int deleteRecursiveInternal(NodeRef nodeRef, int fMaxNumOfNodesInTransaction)
+                                {
+                                    if (!nodeService.exists(nodeRef))
+                                        return 0; // finished
+                                    List<ChildAssociationRef> allChildren = nodeService.getChildAssocs(nodeRef);
+
+                                    // if no child then delete the node, this is a leaf
+                                    if (allChildren == null || allChildren.size() == 0)
                                     {
-                                        return this.deleteRecursiveInternal(fNodeREf,500);
+                                        nodeService.deleteNode(nodeRef);
+                                        return 1;
                                     }
-                                    
-                                    public int deleteRecursiveInternal(NodeRef nodeRef, int fMaxNumOfNodesInTransaction)
+
+                                    // recursive an iterate and count
+                                    int sum = 0;
+                                    for (ChildAssociationRef assoc : allChildren)
                                     {
-                                        if (!nodeService.exists(nodeRef))
-                                            return 0; //finished
-                                        List<ChildAssociationRef> allChildren = nodeService.getChildAssocs(nodeRef);
-                                        
-                                        //if no child then delete the node, this is a leaf
-                                        if ( allChildren == null || allChildren.size() == 0)
-                                        {
-                                           nodeService.deleteNode(nodeRef);
-                                           return 1;
-                                        }
-                                        
-                                        //recursive an iterate and count
-                                        int sum = 0;
-                                        for(ChildAssociationRef assoc: allChildren)
-                                        {
-                                            sum += deleteRecursiveInternal(assoc.getChildRef(), fMaxNumOfNodesInTransaction);
-                                            if (sum >= fMaxNumOfNodesInTransaction)
-                                                break;
-                                        }
-                                        return sum;
+                                        sum += deleteRecursiveInternal(assoc.getChildRef(), fMaxNumOfNodesInTransaction);
+                                        if (sum >= fMaxNumOfNodesInTransaction)
+                                            break;
                                     }
-                                
-                                };
-                                return transactionService.getRetryingTransactionHelper().doInTransaction(recursiveWork, false, true);
+                                    return sum;
+                                }
+
+                            };
+                        return transactionService.getRetryingTransactionHelper().doInTransaction(recursiveWork, false,
+                                true);
                     }
-                    
 
                 };
 
             final AtomicBoolean keepGoing = new AtomicBoolean(true);
             Boolean doMore = false;
-            String lockToken = null;
-            try
-            {
-                // Lock
-                lockToken = jobLockService.getLock(LOCK_QNAME, LOCK_TTL);
-                // Refresh to get callbacks
-                JobLockRefreshCallback callback = new JobLockRefreshCallback()
-                    {
-                        @Override
-                        public void lockReleased()
-                        {
-                            keepGoing.set(false);
-                        }
 
-                        @Override
-                        public boolean isActive()
-                        {
-                            return keepGoing.get();
-                        }
-                    }; 
-                jobLockService.refreshLock(lockToken, LOCK_QNAME, LOCK_TTL, callback);
-                if (logger.isDebugEnabled())
-                {
-                    logger.debug("Lock acquired in TrashcanCleaner");
-                }
-
-                int iteration = 1;
-                do
-                {
-                    if (logger.isDebugEnabled())
-                    {
-                        logger.debug("iteration =" + iteration);
-                    }
-                    iteration++;
-                    doMore = transactionService.getRetryingTransactionHelper().doInTransaction(pagingWork, false, true);
-                }
-                while (doMore == true);
-            }
-            catch (LockAcquisitionException e)
+            int iteration = 1;
+            do
             {
                 if (logger.isDebugEnabled())
                 {
-                    logger.debug("Skipping TrashCanCleaner  " + e.getMessage());
+                    logger.debug("iteration =" + iteration);
                 }
+                iteration++;
+                doMore = transactionService.getRetryingTransactionHelper().doInTransaction(pagingWork, false, true);
             }
-            finally
-            {
-                keepGoing.set(false); // Notify the refresh callback that we are done
-                if (lockToken != null)
-                {
-                    jobLockService.releaseLock(lockToken, LOCK_QNAME);
-                }
-            }
+            while (doMore == true);
 
         }
     }
-    
 
 }
