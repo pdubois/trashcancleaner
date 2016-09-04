@@ -22,17 +22,17 @@
  * the FLOSS exception, and it is also available here: 
  * http://www.alfresco.com/legal/licensing"
  */
-package org.alfresco.demoamp;
+package org.alfresco.trashcan2;
 
 /**
  * This class does nothing except dump some output to <i>system.out</i>.
  * NB: This code is taken from Alfresco Eclipse SDK Samples 
  * @author Derek Hulley
  */
-public class Demo
+public class Cleaner
 {
 	public void init()
 	{
-		System.out.println("SDK Demo AMP class has been loaded");
+		System.out.println("SDK Cleaner AMP class has been loaded");
 	}
 }

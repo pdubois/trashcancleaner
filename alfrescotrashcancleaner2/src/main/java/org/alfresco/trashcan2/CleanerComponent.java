@@ -14,7 +14,7 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
  */
-package org.alfresco.demoamp;
+package org.alfresco.trashcan2;
 
 import org.alfresco.repo.module.AbstractModuleComponent;
 import org.alfresco.repo.nodelocator.NodeLocatorService;
@@ -31,9 +31,9 @@ import org.apache.commons.logging.LogFactory;
  * @author Gabriele Columbro
  * @author Maurizio Pillitu
  */
-public class DemoComponent extends AbstractModuleComponent
+public class CleanerComponent extends AbstractModuleComponent
 {
-    Log log = LogFactory.getLog(DemoComponent.class);
+    Log log = LogFactory.getLog(CleanerComponent.class);
     
     private NodeService nodeService;
     
@@ -53,7 +53,7 @@ public class DemoComponent extends AbstractModuleComponent
     @Override
     protected void executeInternal() throws Throwable
     {
-        System.out.println("DemoComponent has been executed");
+        System.out.println("CleanerComponent has been executed");
         log.debug("Test debug logging. Congratulation your AMP is working");
         log.info("This is only for information purposed. Better remove me from the log in Production");
     }
