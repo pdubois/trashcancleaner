@@ -171,7 +171,6 @@ public class TrashcanCleaner
                             }
                             //Maybe there is more than one element to deleted there
                             //It might be a big three and therefore causing  requiring big or even too big transaction
-                            //nodeService.deleteNode(nodeRef);
                             
                             while(deleteRecursive(nodeRef, 500) != 0);
                         }

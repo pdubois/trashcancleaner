@@ -123,7 +123,28 @@ public class DemoComponentTest
         assertNotNull(serviceRegistry);
         // empty the bin
         InsureBinEmpty();
-        PopulateBinWithBigTree(null);
+        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
+                {
+                    public NodeRef doWork() throws Exception
+                    {
+                        StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                        NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                                RegexQNamePattern.MATCH_ALL,
+                                QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
+
+                        NodeRef companyHome = list.get(0).getChildRef();
+                        NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
+                                "SecondaryParent");
+                        if (secParent == null)
+                        {
+                            secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
+                                    .getNodeRef();
+                        }
+                        return secParent;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+        PopulateBinWithBigTree(secParent);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -306,6 +327,7 @@ public class DemoComponentTest
                             //create a tree of more than 500 file folders
                             String name = "Foundation API sample (" + System.currentTimeMillis() + ")";
                             FileInfo theRoot = fileFolderService.create(companyHome, name, ContentModel.TYPE_FOLDER);
+
                             batchOfNodes.add(theRoot.getNodeRef());
                             for(int j =1; j<700; j++)
                             {
