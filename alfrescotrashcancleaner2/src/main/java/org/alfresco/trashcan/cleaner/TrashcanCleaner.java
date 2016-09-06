@@ -5,18 +5,17 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+
 
 import org.alfresco.model.ContentModel;
 import org.alfresco.query.CannedQueryFactory;
 import org.alfresco.query.CannedQueryResults;
 import org.alfresco.query.PagingRequest;
-import org.alfresco.repo.lock.JobLockService;
-import org.alfresco.repo.lock.JobLockService.JobLockRefreshCallback;
-import org.alfresco.repo.lock.LockAcquisitionException;
 import org.alfresco.repo.model.filefolder.GetChildrenCannedQueryFactory;
 import org.alfresco.repo.node.getchildren.GetChildrenCannedQuery;
+import org.alfresco.repo.site.SiteModel;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
+import org.alfresco.service.cmr.dictionary.DictionaryService;
 import org.alfresco.service.cmr.repository.ChildAssociationRef;
 import org.alfresco.service.cmr.repository.NodeRef;
 import org.alfresco.service.cmr.repository.NodeService;
@@ -39,6 +38,12 @@ public class TrashcanCleaner
 
     private NodeService nodeService;
     private TransactionService transactionService;
+    private DictionaryService dictionaryService;
+
+    public void setDictionaryService(DictionaryService dictionaryService)
+    {
+        this.dictionaryService = dictionaryService;
+    }
 
     private int protectedDays = 7;
     private StoreRef storeRef;
@@ -75,6 +80,18 @@ public class TrashcanCleaner
     }
 
     /**
+     * Return the set of types that needs to be imune against deletion
+     * @return
+     */
+    Set<QName> getTypesToProtect()
+    {
+        HashSet<QName> hset = 
+                new HashSet<QName>();
+        hset.add(SiteModel.TYPE_SITE);
+        return hset;
+    }
+    
+    /**
      * @param protectedDays The protectedDays to set.
      */
     public void setProtectedDays(int protectedDays)
@@ -107,7 +124,7 @@ public class TrashcanCleaner
         }
         if (this.protectedDays > 0)
         {
-
+            final MutableInteger fToSkip = new MutableInteger(0);
             final RetryingTransactionCallback<Boolean> pagingWork = new RetryingTransactionCallback<Boolean>()
                 {
                     public Boolean execute() throws Exception
@@ -128,7 +145,8 @@ public class TrashcanCleaner
                         assocTypeQNames.add(ContentModel.TYPE_CONTENT);
                         assocTypeQNames.add(ContentModel.TYPE_FOLDER);
 
-                        PagingRequest pagingRequest = new PagingRequest(pageLen);
+                        
+                        PagingRequest pagingRequest = new PagingRequest(fToSkip.value,pageLen);
 
                         GetChildrenCannedQuery cq = (GetChildrenCannedQuery) getChildrenCannedQueryFactory
                                 .getCannedQuery(archiveRoot, "*", assocTypeQNames, childTypeQNames, null, sortProps,
@@ -164,23 +182,28 @@ public class TrashcanCleaner
                                         + archivedDate);
                             }
                             // Maybe there is more than one element to deleted there
-                            // It might be a big three and therefore causing requiring big or even too big transaction
-
-                            while (deleteRecursive(nodeRef, 500) != 0);
+                            // It might be a big tree and therefore causing/requiring big or even too big transaction
+                            MutableBoolean fSkipBool = new MutableBoolean(false);
+                            while (deleteRecursive(nodeRef, 500, fSkipBool) != 0);
+                            //it true we have a tree that was pruned but containing 
+                            // a node of type that must be preserved
+                            if(fSkipBool.value == true)
+                                fToSkip.increment();
                         }
 
                         return true;
                     }
 
-                    int deleteRecursive(NodeRef nodeRef, int maxNumOfNodesInTransaction)
+                    int deleteRecursive(NodeRef nodeRef, int maxNumOfNodesInTransaction, MutableBoolean skip)
                     {
                         final NodeRef fNodeREf = nodeRef;
+                        final MutableBoolean fSkip = skip;
                         final int fMaxNumOfNodesInTransaction = maxNumOfNodesInTransaction;
                         final RetryingTransactionCallback<Integer> recursiveWork = new RetryingTransactionCallback<Integer>()
                             {
                                 public Integer execute() throws Exception
                                 {
-                                    return this.deleteRecursiveInternal(fNodeREf, 500);
+                                    return this.deleteRecursiveInternal(fNodeREf, fMaxNumOfNodesInTransaction);
                                 }
 
                                 public int deleteRecursiveInternal(NodeRef nodeRef, int fMaxNumOfNodesInTransaction)
@@ -192,8 +215,20 @@ public class TrashcanCleaner
                                     // if no child then delete the node, this is a leaf
                                     if (allChildren == null || allChildren.size() == 0)
                                     {
-                                        nodeService.deleteNode(nodeRef);
-                                        return 1;
+                                        QName nodeType =nodeService.getType(nodeRef);
+                                        //maybe we need to preserve it 
+                                        if (SiteModel.TYPE_SITE.equals(nodeType) == false &&
+                                                dictionaryService.isSubClass(nodeType, SiteModel.TYPE_SITE) == false)
+                                        {    
+                                              nodeService.deleteNode(nodeRef);
+                                              return 1;
+                                        }
+                                        else
+                                        {     
+                                              fSkip.set(true);
+                                              return 0; //do not delete it
+                                        }
+                                           
                                     }
 
                                     // recursive an iterate and count
@@ -214,7 +249,7 @@ public class TrashcanCleaner
 
                 };
 
-            final AtomicBoolean keepGoing = new AtomicBoolean(true);
+            //final AtomicBoolean keepGoing = new AtomicBoolean(true);
             Boolean doMore = false;
 
             int iteration = 1;
@@ -231,5 +266,39 @@ public class TrashcanCleaner
 
         }
     }
+
+}
+
+class MutableInteger
+{
+  int value;
+  public MutableInteger(int n)
+  {
+    value=n;
+  }
+  public void increment()
+  {
+    ++value;
+  }
+
+}
+
+class MutableBoolean
+{
+  boolean value;
+  public MutableBoolean(boolean v)
+  {
+    value=v;
+  }
+  public void set(boolean v)
+  {
+    value = v;
+  }
+  
+  public boolean get(boolean v)
+  {
+      return value;
+  }
+  
 
 }

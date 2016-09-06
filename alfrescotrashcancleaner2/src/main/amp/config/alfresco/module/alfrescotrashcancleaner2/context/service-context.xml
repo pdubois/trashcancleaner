@@ -45,6 +45,9 @@
         <property name="storeUrl">
             <value>archive://SpacesStore</value>
         </property>
+        <property name="dictionaryService">
+            <ref bean="DictionaryService" />
+        </property>
         <property name="cannedQueryRegistry">
             <ref bean="fileFolderCannedQueryRegistry" />
         </property>
