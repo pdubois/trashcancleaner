@@ -94,32 +94,7 @@ public class DemoComponentTest
     SiteService siteService;
 
 
-//    @Test
-//    public void testPurgeBin()
-//    {
-//        assertNotNull(serviceRegistry);
-//        // empty the bin
-//        InsureBinEmpty();
-//        PopulateBin(null);
-//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//            {
-//                public Object doWork() throws Exception
-//                {
-//                    // try to count number of elements in the bin
-//                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
-//                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-//                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    // test if purge deleted all the elements from the bing
-//                    trashcanCleaner.execute();
-//                    childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    assertEquals(childAssocs.size(), NUM_REMAININGS);
-//                    return null;
-//                }
-//            }, AuthenticationUtil.getSystemUserName());
-//
-//    }
+
     
     @Test
     public void testPurgeBinWithSites()
@@ -127,10 +102,8 @@ public class DemoComponentTest
         assertNotNull(serviceRegistry);
         // empty the bin
         InsureBinEmpty();
-        System.out.println("*******************AFTER InsureBinEmpty");
         populateBinWithSites();
         //PopulateBin(null);
-        System.out.println("*******************AFTER populateBinWithSites");
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -139,10 +112,8 @@ public class DemoComponentTest
                     StoreRef storeRef = new StoreRef("archive://SpacesStore");
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-                    System.out.println("*******************Before execute");
                     // test if purge deleted all the elements from the bin
                     trashcanCleaner.execute();
-                    System.out.println("*******************After execute");
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
                     //none should be delete because they are all sites
                     assertEquals(childAssocs.size(), childAssocAfter.size());
@@ -156,151 +127,151 @@ public class DemoComponentTest
      * Test that it can cope with file folder structure.
      * It chunks the final delete from bin in smaller pieces
      */
-    //@Test
-//    public void testPurgeBinBigTree()
-//    {
-//        assertNotNull(serviceRegistry);
-//        // empty the bin
-//        InsureBinEmpty();
-//        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
-//                {
-//                    public NodeRef doWork() throws Exception
-//                    {
-//                        StoreRef storeRef = new StoreRef("workspace://SpacesStore");
-//                        NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
-//                        List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
-//                                RegexQNamePattern.MATCH_ALL,
-//                                QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
-//
-//                        NodeRef companyHome = list.get(0).getChildRef();
-//                        NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
-//                                "SecondaryParent");
-//                        if (secParent == null)
-//                        {
-//                            secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
-//                                    .getNodeRef();
-//                        }
-//                        return secParent;
-//                    }
-//                }, AuthenticationUtil.getSystemUserName());
-//        PopulateBinWithBigTree(secParent);
-//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//            {
-//                public Object doWork() throws Exception
-//                {
-//                    // try to count number of elements in the bin
-//                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
-//                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-//                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    // test if purge deleted all the elements from the bing
-//                    trashcanCleaner.execute();
-//                    childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    assertEquals(childAssocs.size(), NUM_REMAININGS);
-//                    return null;
-//                }
-//            }, AuthenticationUtil.getSystemUserName());
-//
-//    }
+    @Test
+    public void testPurgeBinBigTree()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
+                {
+                    public NodeRef doWork() throws Exception
+                    {
+                        StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                        NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                                RegexQNamePattern.MATCH_ALL,
+                                QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
 
-    //@Test
-//    public void testPurgeBinWithSecondaryParents()
-//    {
-//        assertNotNull(serviceRegistry);
-//        // empty the bin
-//        InsureBinEmpty();
-//        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
-//            {
-//                public NodeRef doWork() throws Exception
-//                {
-//                    StoreRef storeRef = new StoreRef("workspace://SpacesStore");
-//                    NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
-//                    List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
-//                            RegexQNamePattern.MATCH_ALL,
-//                            QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
-//
-//                    NodeRef companyHome = list.get(0).getChildRef();
-//                    NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
-//                            "SecondaryParent");
-//                    if (secParent == null)
-//                    {
-//                        secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
-//                                .getNodeRef();
-//                    }
-//                    return secParent;
-//                }
-//            }, AuthenticationUtil.getSystemUserName());
-//        PopulateBin(secParent);
-//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//            {
-//                public Object doWork() throws Exception
-//                {
-//                    // try to count number of elements in the bin
-//                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
-//                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-//                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    // test if purge deleted all the elements from the bing
-//                    trashcanCleaner.execute();
-//                    childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                    assertEquals(childAssocs.size(), NUM_REMAININGS);
-//                    return null;
-//                }
-//            }, AuthenticationUtil.getSystemUserName());
-//
-//        final NodeRef fSecParent = secParent;
-//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//            {
-//                public Object doWork() throws Exception
-//                {
-//                    // insure secParent is empty
-//                    int count = nodeService.countChildAssocs(fSecParent, false);
-//                    assertTrue(count == 0);
-//                    return null;
-//                }
-//            }, AuthenticationUtil.getSystemUserName());
-//
-//    }
+                        NodeRef companyHome = list.get(0).getChildRef();
+                        NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
+                                "SecondaryParent");
+                        if (secParent == null)
+                        {
+                            secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
+                                    .getNodeRef();
+                        }
+                        return secParent;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+        PopulateBinWithBigTree(secParent);
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-//    @Test
-//    public void testPurgeBinPageSize()
-//    {
-//        assertNotNull(serviceRegistry);
-//        List<Integer> pageLens = new ArrayList<Integer>(5);
-//        pageLens.add(1);
-//        pageLens.add(5);
-//        pageLens.add(7);
-//        pageLens.add(10);
-//        pageLens.add(13);
-//        for (int pl : pageLens)
-//        {
-//            // empty the bin
-//            InsureBinEmpty();
-//            assertTrue(true);
-//            trashcanCleaner.setPageLen(pl);
-//            PopulateBin(null);
-//            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//                {
-//                    public Object doWork() throws Exception
-//                    {
-//                        // try to count number of elements in the bin
-//                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
-//                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-//                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                        // test if purge deleted all the elements from the bin
-//                        trashcanCleaner.execute();
-//                        childAssocs = nodeService.getChildAssocs(archiveRoot);
-//
-//                        assertEquals(childAssocs.size(), NUM_REMAININGS);
-//                        return null;
-//                    }
-//                }, AuthenticationUtil.getSystemUserName());
-//        }
-//
-//    }
+                    // test if purge deleted all the elements from the bing
+                    trashcanCleaner.execute();
+                    childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    assertEquals(childAssocs.size(), NUM_REMAININGS);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+
+    @Test
+    public void testPurgeBinWithSecondaryParents()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
+            {
+                public NodeRef doWork() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                    NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                            RegexQNamePattern.MATCH_ALL,
+                            QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
+
+                    NodeRef companyHome = list.get(0).getChildRef();
+                    NodeRef secParent = nodeService.getChildByName(companyHome, ContentModel.ASSOC_CONTAINS,
+                            "SecondaryParent");
+                    if (secParent == null)
+                    {
+                        secParent = fileFolderService.create(companyHome, "SecondaryParent", ContentModel.TYPE_FOLDER)
+                                .getNodeRef();
+                    }
+                    return secParent;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+        PopulateBin(secParent);
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    // test if purge deleted all the elements from the bing
+                    trashcanCleaner.execute();
+                    childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                    assertEquals(childAssocs.size(), NUM_REMAININGS);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+        final NodeRef fSecParent = secParent;
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // insure secParent is empty
+                    int count = nodeService.countChildAssocs(fSecParent, false);
+                    assertTrue(count == 0);
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+
+    @Test
+    public void testPurgeBinPageSize()
+    {
+        assertNotNull(serviceRegistry);
+        List<Integer> pageLens = new ArrayList<Integer>(5);
+        pageLens.add(1);
+        pageLens.add(5);
+        pageLens.add(7);
+        pageLens.add(10);
+        pageLens.add(13);
+        for (int pl : pageLens)
+        {
+            // empty the bin
+            InsureBinEmpty();
+            assertTrue(true);
+            trashcanCleaner.setPageLen(pl);
+            PopulateBin(null);
+            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+                {
+                    public Object doWork() throws Exception
+                    {
+                        // try to count number of elements in the bin
+                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        // test if purge deleted all the elements from the bin
+                        trashcanCleaner.execute();
+                        childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        assertEquals(childAssocs.size(), NUM_REMAININGS);
+                        return null;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+        }
+
+    }
 
     protected void PopulateBinWithBigTree(NodeRef secondParent)
     {
@@ -370,9 +341,10 @@ public class DemoComponentTest
                             batchOfNodes.add(theRoot.getNodeRef());
                             for(int j =1; j<700; j++)
                             {
-                                name = "Foundation API sample (" + System.currentTimeMillis() + ")";
+                                name = "Foundation API sample- (" + j + ")";
                                 if(j%10 == 0)
                                 {
+                                    name = "Folder- (" + j + ")";
                                     FileInfo theNewRoot = fileFolderService.create(theRoot.getNodeRef(), name, ContentModel.TYPE_FOLDER); 
                                     theRoot = theNewRoot;
                                 }
@@ -537,14 +509,14 @@ public class DemoComponentTest
                     List<NodeRef> batchOfNodes = new ArrayList<NodeRef>(NODE_CREATION_BATCH_SIZE);
                     for (int i = 0; i < 2; i++)
                     {
-                        System.out.println("*******************Before createSite: " + i);
+
                         // assign name
                         String name = "Site-" + System.currentTimeMillis();
                         
                         SiteInfo siteInfo = siteService.createSite("site-dashboard", name, "Titre" + System.currentTimeMillis(), 
                                     "Description-"+ System.currentTimeMillis(), true);
                         batchOfNodes.add(siteInfo.getNodeRef());
-                        System.out.println("*******************After createSite: " + i);
+
                     }
                     return batchOfNodes;
                 }
@@ -567,6 +539,8 @@ public class DemoComponentTest
                 {
                     for (NodeRef node : batchOfnodes)
                     {
+                        if (nodeService.hasAspect(node, ContentModel.ASPECT_UNDELETABLE))
+                            nodeService.removeAspect(node, ContentModel.ASPECT_UNDELETABLE);
                         nodeService.deleteNode(node);
                     }
 
