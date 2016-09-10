@@ -39,12 +39,7 @@ public class TrashcanCleaner
     private NodeService nodeService;
     private TransactionService transactionService;
     private DictionaryService dictionaryService;
-
-    public void setDictionaryService(DictionaryService dictionaryService)
-    {
-        this.dictionaryService = dictionaryService;
-    }
-
+    private HashSet<QName> setToProtect = new HashSet<QName>();
     private int protectedDays = 7;
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
@@ -55,6 +50,24 @@ public class TrashcanCleaner
         this.pageLen = pageLen;
     }
 
+
+    public void setSetToProtect(HashSet<String> setToProtectString)
+    {
+        setToProtect.clear();
+        //convert to QName
+        for(String qStringName:setToProtectString)
+        {
+            setToProtect.add(QName.createQName(qStringName));
+        }
+    }
+
+    public void setDictionaryService(DictionaryService dictionaryService)
+    {
+        this.dictionaryService = dictionaryService;
+    }
+
+
+    
     /**
      * Set the registry of {@link CannedQueryFactory canned queries}
      */
@@ -85,11 +98,10 @@ public class TrashcanCleaner
      */
     Set<QName> getTypesToProtect()
     {
-        HashSet<QName> hset = 
-                new HashSet<QName>();
-        hset.add(SiteModel.TYPE_SITE);
-        return hset;
+        return setToProtect;
     }
+    
+    
     
     /**
      * @param protectedDays The protectedDays to set.
@@ -115,6 +127,26 @@ public class TrashcanCleaner
         this.storeRef = new StoreRef(storeUrl);
     }
 
+    /**
+     * Return true if type is iqual or a subtype of the type to protect
+     * @param type
+     * @return
+     */
+    protected boolean mustBeProtected(QName type)
+    {
+        Set<QName> typesToProtect = getTypesToProtect();
+        
+        for(QName typeToPtotect:typesToProtect)
+        {
+            if (typeToPtotect.equals(type) == true ||
+                    dictionaryService.isSubClass(type,typeToPtotect) == true)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public void execute()
     {
         if (logger.isDebugEnabled())
@@ -217,8 +249,7 @@ public class TrashcanCleaner
                                     {
                                         QName nodeType =nodeService.getType(nodeRef);
                                         //maybe we need to preserve it 
-                                        if (SiteModel.TYPE_SITE.equals(nodeType) == false &&
-                                                dictionaryService.isSubClass(nodeType, SiteModel.TYPE_SITE) == false)
+                                        if (!mustBeProtected(nodeType))
                                         {    
                                               nodeService.deleteNode(nodeRef);
                                               return 1;

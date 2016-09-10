@@ -1,85 +1,89 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>
-<!--
-    Licensed to the Apache Software Foundation (ASF) under one or more
-    contributor license agreements.  See the NOTICE file distributed with
-    this work for additional information regarding copyright ownership.
-    The ASF licenses this file to You under the Apache License, Version 2.0
-    (the "License"); you may not use this file except in compliance with
-    the License.  You may obtain a copy of the License at
-    	
-    http://www.apache.org/licenses/LICENSE-2.0
-    	
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
--->
+<!-- Licensed to the Apache Software Foundation (ASF) under one or more contributor 
+	license agreements. See the NOTICE file distributed with this work for additional 
+	information regarding copyright ownership. The ASF licenses this file to 
+	You under the Apache License, Version 2.0 (the "License"); you may not use 
+	this file except in compliance with the License. You may obtain a copy of 
+	the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required 
+	by applicable law or agreed to in writing, software distributed under the 
+	License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS 
+	OF ANY KIND, either express or implied. See the License for the specific 
+	language governing permissions and limitations under the License. -->
 <beans>
-    
-    <!-- A simple class that is initialized by Spring -->
-    <bean id="changeme.exampleBean" class="org.alfresco.trashcan2.Cleaner" init-method="init" />
-    
-    <!-- A simple module component that will be executed once -->
-    <bean id="changeme.exampleComponent" class="org.alfresco.trashcan2.CleanerComponent" parent="module.baseComponent" >
-        <property name="moduleId" value="${project.artifactId}" />  <!-- See module.properties -->
-        <property name="name" value="exampleComponent" />
-        <property name="description" value="A demonstration component" />
-        <property name="sinceVersion" value="2.0" />
-        <property name="appliesFromVersion" value="2.0" />
-        <property name="nodeService" ref="NodeService" />
-        <property name="nodeLocatorService" ref="nodeLocatorService" />
-    </bean>
-    
-    <bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
-        <property name="nodeService">
-            <ref bean="nodeService" />
-        </property>
-        <property name="transactionService">
-            <ref bean="TransactionService" />
-        </property>
-        <property name="protectedDays">
-            <value>${trashcan.cleaner.protected.day}</value>
-        </property>
-        <property name="storeUrl">
-            <value>archive://SpacesStore</value>
-        </property>
-        <property name="dictionaryService">
-            <ref bean="DictionaryService" />
-        </property>
-        <property name="cannedQueryRegistry">
-            <ref bean="fileFolderCannedQueryRegistry" />
-        </property>
-        <property name="pageLen" value="${trashcan.cleaner.pagelen}" />
-    </bean>
 
-    <bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">
-        <property name="jobClass">
-            <value>org.alfresco.trashcan.cleaner.TrashcanCleanerJob</value>
-        </property>
-        <property name="jobDataAsMap">
-            <map>
-                <entry key="trashcanCleaner">
-                    <ref bean="trashcanCleaner" />
-                </entry>
-                <entry key="jobLockService">
-                    <ref bean="jobLockService" />
-                </entry>
-            </map>
-        </property>
-    </bean>
+	<!-- A simple class that is initialized by Spring -->
+	<bean id="changeme.exampleBean" class="org.alfresco.trashcan2.Cleaner"
+		init-method="init" />
 
-    <bean id="trashcanCleanerTrigger" class="org.alfresco.util.CronTriggerBean">
-        <property name="jobDetail">
-            <ref bean="trashcanCleanerJobDetail" />
-        </property>
-        <property name="scheduler">
-            <ref bean="schedulerFactory" />
-        </property>
-        <property name="cronExpression">
-            <value>${trashcan.cleaner.cron}</value>
-        </property>
-    </bean>
-    
+	<!-- A simple module component that will be executed once -->
+	<bean id="changeme.exampleComponent" class="org.alfresco.trashcan2.CleanerComponent"
+		parent="module.baseComponent">
+		<property name="moduleId" value="${project.artifactId}" />  <!-- See module.properties -->
+		<property name="name" value="exampleComponent" />
+		<property name="description" value="A demonstration component" />
+		<property name="sinceVersion" value="2.0" />
+		<property name="appliesFromVersion" value="2.0" />
+		<property name="nodeService" ref="NodeService" />
+		<property name="nodeLocatorService" ref="nodeLocatorService" />
+	</bean>
+
+	<bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
+		<property name="nodeService">
+			<ref bean="nodeService" />
+		</property>
+		<property name="transactionService">
+			<ref bean="TransactionService" />
+		</property>
+		<property name="protectedDays">
+			<value>${trashcan.cleaner.protected.day}</value>
+		</property>
+		<property name="storeUrl">
+			<value>archive://SpacesStore</value>
+		</property>
+		<property name="dictionaryService">
+			<ref bean="DictionaryService" />
+		</property>
+		<property name="cannedQueryRegistry">
+			<ref bean="fileFolderCannedQueryRegistry" />
+		</property>
+		<property name="pageLen" value="${trashcan.cleaner.pagelen}" />
+		<!-- Set of type that must be protected from deletetion -->
+		<!-- results in a setAddressSet(java.util.Set) call -->
+		<property name="setToProtect">
+			<set>
+			    <!-- Example: QName of type to protect -->
+				<!-- value>{http://www.alfresco.org/model/site/1.0}site</value -->
+			</set>
+		</property>
+	</bean>
+
+	<bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass">
+			<value>org.alfresco.trashcan.cleaner.TrashcanCleanerJob</value>
+		</property>
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="trashcanCleaner">
+					<ref bean="trashcanCleaner" />
+				</entry>
+				<entry key="jobLockService">
+					<ref bean="jobLockService" />
+				</entry>
+			</map>
+		</property>
+	</bean>
+
+	<bean id="trashcanCleanerTrigger" class="org.alfresco.util.CronTriggerBean">
+		<property name="jobDetail">
+			<ref bean="trashcanCleanerJobDetail" />
+		</property>
+		<property name="scheduler">
+			<ref bean="schedulerFactory" />
+		</property>
+		<property name="cronExpression">
+			<value>${trashcan.cleaner.cron}</value>
+		</property>
+	</bean>
+
 </beans>

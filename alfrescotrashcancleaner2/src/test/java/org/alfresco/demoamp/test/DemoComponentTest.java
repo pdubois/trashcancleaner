@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -100,6 +101,9 @@ public class DemoComponentTest
     public void testPurgeBinWithSites()
     {
         assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        typeToProtect.add("{http://www.alfresco.org/model/site/1.0}site");
+        trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
         populateBinWithSites();
@@ -131,6 +135,8 @@ public class DemoComponentTest
     public void testPurgeBinBigTree()
     {
         assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
         NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
@@ -179,6 +185,8 @@ public class DemoComponentTest
     public void testPurgeBinWithSecondaryParents()
     {
         assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
         NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
@@ -239,6 +247,8 @@ public class DemoComponentTest
     public void testPurgeBinPageSize()
     {
         assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        trashcanCleaner.setSetToProtect(typeToProtect);
         List<Integer> pageLens = new ArrayList<Integer>(5);
         pageLens.add(1);
         pageLens.add(5);
