@@ -213,6 +213,7 @@ public class DemoComponentTest {
 			try {
 				// configure the scheduler time
 				SimpleTrigger trigger = new SimpleTrigger();
+				trigger.setName("TESTTRIGGER");
 				trigger.setStartTime(new Date(
 						System.currentTimeMillis() + 1000L));
 				trigger.setRepeatInterval(1);
