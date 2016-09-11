@@ -26,6 +26,49 @@ trashcan.cleaner.protected.day=7
 trashcan.cleaner.cron=0 0 4 * * ?
 trashcan.cleaner.pagelen=3
 ```
+## Protecting types from deletion
+
+It is possible to protect some types from  automatic deletion by the trashcancleaner by overriding trashcanCleaner bean definition under 
+shared/classes/alfresco/extention in a *-context.xml file.
+
+
+### Example:
+
+```
+	<bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
+		<property name="nodeService">
+			<ref bean="nodeService" />
+		</property>
+		<property name="transactionService">
+			<ref bean="TransactionService" />
+		</property>
+		<property name="protectedDays">
+			<value>${trashcan.cleaner.protected.day}</value>
+		</property>
+		<property name="storeUrl">
+			<value>archive://SpacesStore</value>
+		</property>
+		<property name="dictionaryService">
+			<ref bean="DictionaryService" />
+		</property>
+		<property name="cannedQueryRegistry">
+			<ref bean="fileFolderCannedQueryRegistry" />
+		</property>
+		<property name="pageLen" value="${trashcan.cleaner.pagelen}" />
+		<!-- Set of type that must be protected from deletetion -->
+		<!-- results in a setAddressSet(java.util.Set) call -->
+		<property name="setToProtect">
+			<set>
+			    <!-- Example: QName of type to protect -->
+			    <!-- Long version of the prefix QName must be used -->
+				<value>{http://www.alfresco.org/model/site/1.0}site</value>
+			</set>
+		</property>
+	</bean>
+```
+
+
+
 ## Gotcha:
 When installing the module with the Module Management Tool (MMT) spcify the "-force" option or remove manually "slf4j-api-1.7.5.jar" from the module.
 
