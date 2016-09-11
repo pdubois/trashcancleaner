@@ -242,12 +242,24 @@ public class DemoComponentTest {
 				}
 				while (trashcanCleaner.getStatus() == TrashcanCleaner.Status.RUNNING);
 
-				StoreRef storeRef = new StoreRef("archive://SpacesStore");
-				NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-				List<ChildAssociationRef> childAssocs = nodeService
-						.getChildAssocs(archiveRoot);
+				AuthenticationUtil.runAs(
+						new AuthenticationUtil.RunAsWork<Object>() {
+							public Object doWork() throws Exception {
+								// try to count number of elements in the bin
+								StoreRef storeRef = new StoreRef(
+										"archive://SpacesStore");
+								NodeRef archiveRoot = nodeService
+										.getRootNode(storeRef);
+								List<ChildAssociationRef> childAssocs = nodeService
+										.getChildAssocs(archiveRoot);
 
-				assertEquals(childAssocs.size(), NUM_REMAININGS);
+								childAssocs = nodeService
+										.getChildAssocs(archiveRoot);
+
+								assertEquals(childAssocs.size(), NUM_REMAININGS);
+								return null;
+							}
+						}, AuthenticationUtil.getSystemUserName());
 
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
