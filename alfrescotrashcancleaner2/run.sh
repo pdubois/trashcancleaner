@@ -6,4 +6,5 @@ if [ ! -f $springloadedfile ]; then
 mvn validate -Psetup
 fi
 
-MAVEN_OPTS="-javaagent:$springloadedfile -noverify -Xms256m -Xmx2G -XX:PermSize=300m" mvn integration-test -Pamp-to-war
+MAVEN_OPTS="-javaagent:$springloadedfile -noverify -Xms256m -Xmx2G -XX:PermSize=300m -Djava.net.preferIPv4Stack=true -Xdebug -Xrunjdwp:transport=dt_socket,address=5000,server=y,suspend=n" 
+mvn integration-test -Dskiptest=true -Pamp-to-war

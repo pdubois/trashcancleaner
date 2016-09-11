@@ -44,7 +44,18 @@ public class TrashcanCleaner
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
     private int pageLen = 3;
+	public enum Status {
+        RUNNING,STOPPED
+    }
+    private Status status = Status.STOPPED; 
+    
+    public Status getStatus() {
+		return status;
+	}
 
+    
+    
+    
     public void setPageLen(int pageLen)
     {
         this.pageLen = pageLen;
@@ -148,6 +159,18 @@ public class TrashcanCleaner
     }
     
     public void execute()
+    {
+    	try{
+    		status = Status.RUNNING;
+    		executeLocalInternal();
+    	}
+    	finally
+    	{
+           status= Status.STOPPED;
+    	}
+    }
+    
+    private void executeLocalInternal()
     {
         if (logger.isDebugEnabled())
         {
