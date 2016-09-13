@@ -108,7 +108,7 @@ public class DemoComponentTest {
 	@Qualifier("trashcanCleanerJobDetail")
 	JobDetailBean trashcanCleanerJobDetail;
 
-	//@Test
+	@Test
 	public void testPurgeBinWithSites() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
@@ -137,7 +137,7 @@ public class DemoComponentTest {
 
 	}
 
-	//@Test
+	@Test
 	public void testPurgeBinBigTreeDirect() {
 		testPurgeBinBigTree(true);
 	}
@@ -272,7 +272,7 @@ public class DemoComponentTest {
 
 	}
 
-	//@Test
+	@Test
 	public void testPurgeBinWithSecondaryParents() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
@@ -335,7 +335,7 @@ public class DemoComponentTest {
 
 	}
 
-	//@Test
+	@Test
 	public void testPurgeBinPageSize() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
