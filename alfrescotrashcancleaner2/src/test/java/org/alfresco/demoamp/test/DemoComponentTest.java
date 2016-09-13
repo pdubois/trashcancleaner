@@ -108,7 +108,7 @@ public class DemoComponentTest {
 	@Qualifier("trashcanCleanerJobDetail")
 	JobDetailBean trashcanCleanerJobDetail;
 
-	@Test
+	//@Test
 	public void testPurgeBinWithSites() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
@@ -137,7 +137,7 @@ public class DemoComponentTest {
 
 	}
 
-	@Test
+	//@Test
 	public void testPurgeBinBigTreeDirect() {
 		testPurgeBinBigTree(true);
 	}
@@ -234,14 +234,15 @@ public class DemoComponentTest {
 				// Should be running here
 				// trashcanCleaner.getStatus();
 
-				{
+				do{
+				    System.out.println("*********************************************************************Before SLEEP");
 					try {
 						Thread.sleep(4000L);
 					} catch (InterruptedException e1) {
 					}
 				}
 				while (trashcanCleaner.getStatus() == TrashcanCleaner.Status.RUNNING);
-
+                System.out.println("*********************************************************************Finished");
 				AuthenticationUtil.runAs(
 						new AuthenticationUtil.RunAsWork<Object>() {
 							public Object doWork() throws Exception {
@@ -267,10 +268,11 @@ public class DemoComponentTest {
 				e.printStackTrace();
 			}
 		}
+        System.out.println("*********************************************************************VERIFIED");
 
 	}
 
-	@Test
+	//@Test
 	public void testPurgeBinWithSecondaryParents() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
@@ -333,7 +335,7 @@ public class DemoComponentTest {
 
 	}
 
-	@Test
+	//@Test
 	public void testPurgeBinPageSize() {
 		assertNotNull(serviceRegistry);
 		HashSet<String> typeToProtect = new HashSet<String>();
