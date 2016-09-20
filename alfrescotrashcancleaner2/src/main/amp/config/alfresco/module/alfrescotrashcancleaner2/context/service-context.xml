@@ -47,6 +47,9 @@
 		<property name="cannedQueryRegistry">
 			<ref bean="fileFolderCannedQueryRegistry" />
 		</property>
+		<property name="jobLockService">
+            <ref bean="jobLockService" />
+        </property>
 		<property name="pageLen" value="${trashcan.cleaner.pagelen}" />
 		<!-- Set of type that must be protected from deletetion -->
 		<!-- results in a setAddressSet(java.util.Set) call -->
@@ -66,9 +69,6 @@
 			<map>
 				<entry key="trashcanCleaner">
 					<ref bean="trashcanCleaner" />
-				</entry>
-				<entry key="jobLockService">
-					<ref bean="jobLockService" />
 				</entry>
 			</map>
 		</property>

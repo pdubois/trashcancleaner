@@ -5,15 +5,17 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.alfresco.model.ContentModel;
 import org.alfresco.query.CannedQueryFactory;
 import org.alfresco.query.CannedQueryResults;
 import org.alfresco.query.PagingRequest;
+import org.alfresco.repo.lock.JobLockService;
+import org.alfresco.repo.lock.JobLockService.JobLockRefreshCallback;
+import org.alfresco.repo.lock.LockAcquisitionException;
 import org.alfresco.repo.model.filefolder.GetChildrenCannedQueryFactory;
 import org.alfresco.repo.node.getchildren.GetChildrenCannedQuery;
-import org.alfresco.repo.site.SiteModel;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
 import org.alfresco.service.cmr.dictionary.DictionaryService;
 import org.alfresco.service.cmr.repository.ChildAssociationRef;
@@ -23,6 +25,7 @@ import org.alfresco.service.cmr.repository.StoreRef;
 import org.alfresco.service.namespace.NamespaceService;
 import org.alfresco.service.namespace.QName;
 import org.alfresco.service.transaction.TransactionService;
+import org.alfresco.trashcan2.CleanerComponent;
 import org.alfresco.util.Pair;
 import org.alfresco.util.registry.NamedObjectRegistry;
 import org.apache.commons.logging.Log;
@@ -44,29 +47,36 @@ public class TrashcanCleaner
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
     private int pageLen = 3;
-	public enum Status {
-        RUNNING,STOPPED
-    }
-    private Status status = Status.STOPPED; 
-    
-    public Status getStatus() {
-		return status;
-	}
 
-    
-    
-    
+    public enum Status
+    {
+        RUNNING, STOPPED
+    }
+
+    private Status status = Status.STOPPED;
+
+    public Status getStatus()
+    {
+        return status;
+    }
+
     public void setPageLen(int pageLen)
     {
         this.pageLen = pageLen;
     }
 
+    private JobLockService jobLockService;
+
+    public void setJobLockService(JobLockService jobLockService)
+    {
+        this.jobLockService = jobLockService;
+    }
 
     public void setSetToProtect(HashSet<String> setToProtectString)
     {
         setToProtect.clear();
-        //convert to QName
-        for(String qStringName:setToProtectString)
+        // convert to QName
+        for (String qStringName : setToProtectString)
         {
             setToProtect.add(QName.createQName(qStringName));
         }
@@ -77,8 +87,6 @@ public class TrashcanCleaner
         this.dictionaryService = dictionaryService;
     }
 
-
-    
     /**
      * Set the registry of {@link CannedQueryFactory canned queries}
      */
@@ -105,15 +113,14 @@ public class TrashcanCleaner
 
     /**
      * Return the set of types that needs to be imune against deletion
+     * 
      * @return
      */
     Set<QName> getTypesToProtect()
     {
         return setToProtect;
     }
-    
-    
-    
+
     /**
      * @param protectedDays The protectedDays to set.
      */
@@ -140,36 +147,106 @@ public class TrashcanCleaner
 
     /**
      * Return true if type is iqual or a subtype of the type to protect
+     * 
      * @param type
      * @return
      */
     protected boolean mustBeProtected(QName type)
     {
         Set<QName> typesToProtect = getTypesToProtect();
-        
-        for(QName typeToPtotect:typesToProtect)
+
+        for (QName typeToPtotect : typesToProtect)
         {
-            if (typeToPtotect.equals(type) == true ||
-                    dictionaryService.isSubClass(type,typeToPtotect) == true)
+            if (typeToPtotect.equals(type) == true || dictionaryService.isSubClass(type, typeToPtotect) == true)
             {
                 return true;
             }
         }
         return false;
     }
-    
+
     public void execute()
     {
-    	try{
-    		status = Status.RUNNING;
-    		executeLocalInternal();
-    	}
-    	finally
-    	{
-           status= Status.STOPPED;
-    	}
+        String lockToken = null;
+        final AtomicBoolean keepGoing = new AtomicBoolean(true);
+        try
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("In trash can execte!!");
+            }
+
+            // Lock
+            lockToken = jobLockService.getLock(LOCK_QNAME, LOCK_TTL);
+            // Refresh to get callbacks
+            JobLockRefreshCallback callback = new JobLockRefreshCallback()
+                {
+                    @Override
+                    public void lockReleased()
+                    {
+                        if (logger.isDebugEnabled())
+                        {
+                            logger.debug("In trash can lockReleased!!");
+                        }
+                        keepGoing.set(false);
+                        status = Status.STOPPED;
+                    }
+
+                    @Override
+                    public boolean isActive()
+                    {
+                        if (logger.isDebugEnabled())
+                        {
+                            logger.debug("In trash can isActive()!!");
+                        }
+
+                        return keepGoing.get();
+                    }
+                };
+            jobLockService.refreshLock(lockToken, LOCK_QNAME, LOCK_TTL, callback);
+
+            status = Status.RUNNING;
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Before Execute internal !");
+            }
+
+            executeLocalInternal();
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("After Execute internal !");
+            }
+            
+            //jobLockService.releaseLock(lockToken, LOCK_QNAME);
+        }
+        catch (LockAcquisitionException e)
+        {
+            
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Lock acquisition failed!", e);
+            }
+
+        }
+        finally
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Finally before released lock !!");
+            }
+            keepGoing.set(false); // Notify the refresh callback that we are done
+            if (lockToken != null)
+            {
+                jobLockService.releaseLock(lockToken, LOCK_QNAME);
+                status = Status.STOPPED;
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("After released lock !!");
+                }
+            }
+        }
     }
-    
+
     private void executeLocalInternal()
     {
         if (logger.isDebugEnabled())
@@ -200,8 +277,7 @@ public class TrashcanCleaner
                         assocTypeQNames.add(ContentModel.TYPE_CONTENT);
                         assocTypeQNames.add(ContentModel.TYPE_FOLDER);
 
-                        
-                        PagingRequest pagingRequest = new PagingRequest(fToSkip.value,pageLen);
+                        PagingRequest pagingRequest = new PagingRequest(fToSkip.value, pageLen);
 
                         GetChildrenCannedQuery cq = (GetChildrenCannedQuery) getChildrenCannedQueryFactory
                                 .getCannedQuery(archiveRoot, "*", assocTypeQNames, childTypeQNames, null, sortProps,
@@ -240,9 +316,9 @@ public class TrashcanCleaner
                             // It might be a big tree and therefore causing/requiring big or even too big transaction
                             MutableBoolean fSkipBool = new MutableBoolean(false);
                             while (deleteRecursive(nodeRef, 500, fSkipBool) != 0);
-                            //it true we have a tree that was pruned but containing 
+                            // it true we have a tree that was pruned but containing
                             // a node of type that must be preserved
-                            if(fSkipBool.value == true)
+                            if (fSkipBool.value == true)
                                 fToSkip.increment();
                         }
 
@@ -270,19 +346,19 @@ public class TrashcanCleaner
                                     // if no child then delete the node, this is a leaf
                                     if (allChildren == null || allChildren.size() == 0)
                                     {
-                                        QName nodeType =nodeService.getType(nodeRef);
-                                        //maybe we need to preserve it 
+                                        QName nodeType = nodeService.getType(nodeRef);
+                                        // maybe we need to preserve it
                                         if (!mustBeProtected(nodeType))
-                                        {    
-                                              nodeService.deleteNode(nodeRef);
-                                              return 1;
+                                        {
+                                            nodeService.deleteNode(nodeRef);
+                                            return 1;
                                         }
                                         else
-                                        {     
-                                              fSkip.set(true);
-                                              return 0; //do not delete it
+                                        {
+                                            fSkip.set(true);
+                                            return 0; // do not delete it
                                         }
-                                           
+
                                     }
 
                                     // recursive an iterate and count
@@ -303,7 +379,7 @@ public class TrashcanCleaner
 
                 };
 
-            //final AtomicBoolean keepGoing = new AtomicBoolean(true);
+            // final AtomicBoolean keepGoing = new AtomicBoolean(true);
             Boolean doMore = false;
 
             int iteration = 1;
@@ -325,34 +401,37 @@ public class TrashcanCleaner
 
 class MutableInteger
 {
-  int value;
-  public MutableInteger(int n)
-  {
-    value=n;
-  }
-  public void increment()
-  {
-    ++value;
-  }
+    int value;
+
+    public MutableInteger(int n)
+    {
+        value = n;
+    }
+
+    public void increment()
+    {
+        ++value;
+    }
 
 }
 
 class MutableBoolean
 {
-  boolean value;
-  public MutableBoolean(boolean v)
-  {
-    value=v;
-  }
-  public void set(boolean v)
-  {
-    value = v;
-  }
-  
-  public boolean get(boolean v)
-  {
-      return value;
-  }
-  
+    boolean value;
+
+    public MutableBoolean(boolean v)
+    {
+        value = v;
+    }
+
+    public void set(boolean v)
+    {
+        value = v;
+    }
+
+    public boolean get(boolean v)
+    {
+        return value;
+    }
 
 }

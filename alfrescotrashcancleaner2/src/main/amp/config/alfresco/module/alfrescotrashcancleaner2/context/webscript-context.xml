@@ -12,7 +12,7 @@
 	language governing permissions and limitations under the License. -->
 <beans>
 
-    <bean id="webscript.org.alfresco.getssdinfo.get" class="org.alfresco.trashcan.webscripts.GetStatus"
+    <bean id="webscript.getstatus.get" class="org.alfresco.trashcan.webscripts.GetStatus"
         parent="webscript">
  
     </bean>

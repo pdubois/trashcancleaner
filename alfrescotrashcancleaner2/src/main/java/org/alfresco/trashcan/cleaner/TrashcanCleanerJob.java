@@ -2,15 +2,16 @@ package org.alfresco.trashcan.cleaner;
 
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.repo.security.authentication.AuthenticationUtil;
-import org.alfresco.schedule.AbstractScheduledLockedJob;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.springframework.scheduling.quartz.QuartzJobBean;
+import org.alfresco.trashcan.cleaner.TrashcanCleaner;
 
-public class TrashcanCleanerJob extends AbstractScheduledLockedJob {
+public class TrashcanCleanerJob extends QuartzJobBean {
 
   @Override
-  public void executeJob(JobExecutionContext context) throws JobExecutionException {
+  public void executeInternal(JobExecutionContext context) throws JobExecutionException {
     JobDataMap jobData = context.getJobDetail().getJobDataMap();
     // extract the content cleaner to use
     Object trashcanCleanerObj = jobData.get("trashcanCleaner");
