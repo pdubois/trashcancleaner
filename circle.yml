@@ -9,5 +9,5 @@ general:
 
 test:
   override:
-  - mvn  install  
+  - cd ./repo-amp; mvn  install  
 
