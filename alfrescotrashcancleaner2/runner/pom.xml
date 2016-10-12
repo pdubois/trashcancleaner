@@ -9,7 +9,7 @@
     <parent>
         <groupId>org.alfresco.trashcan.cleaner2</groupId>
         <artifactId>alfrescotrashcancleaner2</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.4-SNAPSHOT</version>
     </parent>
 
     <profiles>
