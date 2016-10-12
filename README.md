@@ -1,5 +1,7 @@
 # trashcancleaner
-Alfresco trashcancleaner using canned queries for purging a large number of nodes from the bin.
+Alfresco trashcancleaner using canned queries for purging a large number of nodes from the bin. The  SDK-2.1.0 branch is 
+build using alfresco SDK2.1.0. meaning compatible with alfresco versions 5.0.1+ and 5.0.d+ see http://docs.alfresco.com/5.0/concepts/alfresco-sdk-compatibility.html.
+This branch is based on the alfresco-amp-archetype, see http://docs.alfresco.com/5.0/tasks/alfresco-sdk-tutorials-all-in-one-archetype.html
 
 ## Building the module:
 
