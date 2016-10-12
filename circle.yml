@@ -9,5 +9,5 @@ general:
 
 test:
   override:
-  - mvn  clean install
+  - mvn  integration-test  
 
