@@ -1,0 +1,13 @@
+machine:
+  timezone:
+    Europe/Paris
+  java:
+    version: oraclejdk8
+
+general:
+  build_dir: alfrescotrashcancleaner2
+
+test:
+  override:
+  - mvn integration-test
+
