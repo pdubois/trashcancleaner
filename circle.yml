@@ -9,5 +9,5 @@ general:
 
 test:
   override:
-  - mvn test
+  - mvn clean install
 
