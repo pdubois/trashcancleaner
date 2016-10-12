@@ -1,5 +1,7 @@
 # trashcancleaner
+UNDER CONSTRUCTION!!!
 Alfresco trashcancleaner using canned queries for purging a large number of nodes from the bin.
+
 
 ## Building the module:
 
