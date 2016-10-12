@@ -9,5 +9,5 @@ general:
 
 test:
   override:
-  - mvn -DfailIfNoTests=false -Dtest=DemoComponentTest test
+  - mvn integration-test
 
