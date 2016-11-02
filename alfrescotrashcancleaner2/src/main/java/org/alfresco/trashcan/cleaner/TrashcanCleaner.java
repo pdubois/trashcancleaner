@@ -303,8 +303,11 @@ public class TrashcanCleaner
                         {
                             Date archivedDate = (Date) nodeService
                                     .getProperty(nodeRef, ContentModel.PROP_ARCHIVED_DATE);
-
-                            if (archivedDate.compareTo(toDate) >= 0)
+                            //here we are testing the case if some node are in archive but not having ContentModel.PROP_ARCHIVED_DATE
+                            //I also probably mean that the aspect ASPECT_ARCHIVED is not there neither.
+                            //Therefore we display a warning when aspect ASPECT_ARCHIVED is not present or PROP_ARCHIVED_DATE
+                            //is null. Given that there elements are skipped we do the tests in deleteRecursive(...)
+                            if (archivedDate != null && archivedDate.compareTo(toDate) >= 0)
                                 return false;
                             String name = (String) nodeService.getProperty(nodeRef, ContentModel.PROP_NAME);
                             if (logger.isDebugEnabled())
@@ -334,6 +337,25 @@ public class TrashcanCleaner
                             {
                                 public Integer execute() throws Exception
                                 {
+                                    
+                                    if (!nodeService.exists(fNodeREf))
+                                        return 0; // finished
+                                    //before trying to prune, we test if the root none has aspect ASPECT_ARCHIVED
+                                    if(!nodeService.hasAspect(fNodeREf, ContentModel.ASPECT_ARCHIVED))
+                                    {
+                                        //issue a warning it does not look normal and skip it
+                                        logger.warn("Expected ASPECT_ARCHIVED on " + fNodeREf + " to be present. Node skipped!");
+                                        fSkip.set(true);
+                                        return 0; // do not delete it
+                                    }
+                                    //also testing ContentModel.PROP_ARCHIVED_DATE != null
+                                    if(nodeService.getProperty(fNodeREf, ContentModel.PROP_ARCHIVED_DATE)== null)
+                                    {
+                                        //issue a warning it does not look normal and skip it
+                                        logger.warn("Expected PROP_ARCHIVED_DATE on " + fNodeREf + " not null. Node skipped!");
+                                        fSkip.set(true);
+                                        return 0; // do not delete it
+                                    }
                                     return this.deleteRecursiveInternal(fNodeREf, fMaxNumOfNodesInTransaction);
                                 }
 

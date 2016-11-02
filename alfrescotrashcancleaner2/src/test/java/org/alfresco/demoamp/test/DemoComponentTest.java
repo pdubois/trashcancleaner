@@ -103,6 +103,8 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("trashcanCleanerJobDetail")
     JobDetailBean trashcanCleanerJobDetail;
+    
+
 
     @Test
     public void testPurgeBinWithSites()
@@ -134,6 +136,51 @@ public class DemoComponentTest
 
     }
 
+    
+    @Test
+    public void testPurgeBinWithNoArchivedAspectProps()
+    {
+        assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        trashcanCleaner.setSetToProtect(typeToProtect);
+        // empty the bin
+        InsureBinEmpty();
+        PopulateBin(null);
+        final TransactionService fTransactionService = serviceRegistry.getTransactionService();
+//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+//                {
+//                    public Object doWork() throws Exception
+//                    {
+//                        offsetNodesInBin(fTransactionService);
+//                        return null;
+//                    }
+//                }, AuthenticationUtil.getSystemUserName());
+
+        RemoveAspectArchivedInBin(fTransactionService, 10); //Those 10 should be preserved from deletion
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    // test if purge deleted all the elements from the bin
+                    trashcanCleaner.execute();
+                    List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
+                    System.out.println("-----------------BEFORE:" + childAssocs.size());
+                    System.out.println("-----------------AFTER:" + childAssocs.size());
+                    // none should be delete because they are all sites
+                    assertEquals(childAssocs.size(), childAssocAfter.size());
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+
+    
+    
+    
     @Test
     public void testPurgeBinBigTreeDirect()
     {
@@ -684,6 +731,48 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
     }
 
+    /**
+     * Remove the aspect ASPECT_ARCHIVED
+     * @param transactionService
+     * @param numOfNodesToRemoveAspect
+     */
+    protected void RemoveAspectArchivedInBin(TransactionService transactionService, int numOfNodesToRemoveAspect)
+    {
+        final TransactionService fTransactionService = transactionService;
+        final int fNNumOfNodesToRemoveAspect = numOfNodesToRemoveAspect;
+        final RetryingTransactionCallback<List<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<List<NodeRef>>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    int i = 0;
+                    for (ChildAssociationRef childAssoc : childAssocs)
+                    {
+                        if (i > fNNumOfNodesToRemoveAspect)
+                            break;
+                        i++;
+                        
+                        nodeService.removeAspect(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED);
+
+                    }
+
+                    return null;
+                }
+            };
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                            getArchivedNodeDateOffseted);
+                }
+            }, AuthenticationUtil.getSystemUserName());
+    }
+
+    
+    
     protected void InsureBinEmpty()
     {
         // use TransactionWork to wrap service calls in a user transaction
