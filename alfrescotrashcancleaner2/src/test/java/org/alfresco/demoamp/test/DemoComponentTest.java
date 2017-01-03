@@ -69,7 +69,10 @@ public class DemoComponentTest
     private static final int NODE_CREATION_BATCH_SIZE = 200;
     private static final int NUM_OF_DELETED = 10;
     private static final int NUM_REMAININGS = NODE_CREATION_BATCH_SIZE - NUM_OF_DELETED + 1;
-
+    private static final String CUSTOM_CONTENT_URI = "custom.model";
+    private static final QName CUSTOM_CONTENT_MODEL = QName.createQName(CUSTOM_CONTENT_URI, "mycontent");
+    private static final QName CUSTOM_FOLDER_MODEL = QName.createQName(CUSTOM_CONTENT_URI, "myfolder");
+    
     static Logger log = Logger.getLogger(DemoComponentTest.class);
 
     @Autowired
@@ -145,7 +148,7 @@ public class DemoComponentTest
         trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
-        PopulateBin(null);
+        PopulateBin(null,null,null);
         final TransactionService fTransactionService = serviceRegistry.getTransactionService();
 //        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
 //                {
@@ -472,7 +475,7 @@ public class DemoComponentTest
                     return secParent;
                 }
             }, AuthenticationUtil.getSystemUserName());
-        PopulateBin(secParent);
+        PopulateBin(secParent,null, null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -523,7 +526,7 @@ public class DemoComponentTest
             InsureBinEmpty();
             assertTrue(true);
             trashcanCleaner.setPageLen(pl);
-            PopulateBin(null);
+            PopulateBin(null,null,null);
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
                     public Object doWork() throws Exception
@@ -543,6 +546,35 @@ public class DemoComponentTest
                     }
                 }, AuthenticationUtil.getSystemUserName());
         }
+
+    }
+    
+    
+    @Test
+    public void testPurgeBinWithCustomTypes()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        PopulateBin(null,CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL );
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    //test if purge deleted all the elements from the bin
+                    System.out.println("**** Child Assoc Before: " +  childAssocs.size());
+                    trashcanCleaner.execute();
+                    List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
+                    System.out.println("**** Child Assoc Before: " +  childAssocAfter.size());
+                    // Should all be deleted because not custom type
+                    assertEquals(childAssocs.size() - NUM_OF_DELETED, childAssocAfter.size() );
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
 
     }
 
@@ -887,9 +919,13 @@ public class DemoComponentTest
 
     }
 
-    protected void PopulateBin(NodeRef secondParent)
+    
+    protected void PopulateBin(NodeRef secondParent, QName customContentType, QName customFolderType)
     {
         final NodeRef fSecondParent = secondParent;
+        final QName fCustomContentType = customContentType;
+        final QName fCustomFolderTypee = customFolderType;
+        
         // use TransactionWork to wrap service calls in a user transaction
         TransactionService transactionService = serviceRegistry.getTransactionService();
         final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
@@ -941,6 +977,9 @@ public class DemoComponentTest
                             nodeService.addChild(fSecondParent, content, ContentModel.ASSOC_CONTAINS,
                                     QName.createQName(NamespaceService.CONTENT_MODEL_PREFIX, name));
                         }
+                        
+                        if (fCustomContentType != null)
+                            nodeService.setType(content, fCustomContentType);
                         batchOfNodes.add(content);
                     }
                     return batchOfNodes;

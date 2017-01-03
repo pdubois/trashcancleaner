@@ -274,8 +274,9 @@ public class TrashcanCleaner
                         assocTypeQNames.add(ContentModel.ASSOC_CHILDREN);
 
                         Set<QName> childTypeQNames = new HashSet<QName>(2);
-                        assocTypeQNames.add(ContentModel.TYPE_CONTENT);
-                        assocTypeQNames.add(ContentModel.TYPE_FOLDER);
+                        //Other custom types are purged
+                        //childTypeQNames.add(ContentModel.TYPE_CONTENT);
+                        //childTypeQNames.add(ContentModel.TYPE_FOLDER);
 
                         PagingRequest pagingRequest = new PagingRequest(fToSkip.value, pageLen);
 
