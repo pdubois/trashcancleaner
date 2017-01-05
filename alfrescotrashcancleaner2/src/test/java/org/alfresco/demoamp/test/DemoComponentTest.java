@@ -139,6 +139,63 @@ public class DemoComponentTest
 
     }
 
+    @Test
+    public void testPurgeBinWithNodeToProtect()
+    {
+        assertNotNull(serviceRegistry);
+        InsureBinEmpty();
+        HashSet<NodeRef> nodesInTheBin= populateBin(null, null, null);
+        System.out.println("******* nodesInTheBin = " + nodesInTheBin.size());
+        StringBuffer  sb = new StringBuffer();
+        int i = 0;
+        int numToDel = 0;
+        for (NodeRef nr : nodesInTheBin)
+        {
+            if (i%2 == 0)
+            {
+
+                if (sb.length() == 0)
+                {
+                    sb.append(nr.toString());
+                }
+                else
+                {
+                    sb.append(",");
+                    sb.append(nr.toString());
+                }
+            }
+            else
+            {
+                numToDel++; 
+            }
+            i++;
+        }
+        System.out.println("******* sb.toString() = " + sb.toString());
+        System.out.println("******* numToDel = " + numToDel);
+        trashcanCleaner.setNodesToSkip(sb.toString());
+        final int fnumToDel = numToDel;
+        // PopulateBin(null);
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    // try to count number of elements in the bin
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    // test if purge deleted all the elements from the bin
+                    trashcanCleaner.execute();
+                    List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
+                    // none should be delete because they are all sites
+                    System.out.println("******* childAssocs.size()-fnumToDel = " + (childAssocs.size()-fnumToDel));
+                    System.out.println("******* childAssocAfter.size() = " + childAssocAfter.size());
+                    assertEquals(childAssocs.size()-fnumToDel, childAssocAfter.size());
+                    return null;
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
+    
     
     @Test
     public void testPurgeBinWithNoArchivedAspectProps()
@@ -148,16 +205,8 @@ public class DemoComponentTest
         trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
-        PopulateBin(null,null,null);
+        populateBin(null,null,null);
         final TransactionService fTransactionService = serviceRegistry.getTransactionService();
-//        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-//                {
-//                    public Object doWork() throws Exception
-//                    {
-//                        offsetNodesInBin(fTransactionService);
-//                        return null;
-//                    }
-//                }, AuthenticationUtil.getSystemUserName());
 
         RemoveAspectArchivedInBin(fTransactionService, 10); //Those 10 should be preserved from deletion
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
@@ -475,7 +524,7 @@ public class DemoComponentTest
                     return secParent;
                 }
             }, AuthenticationUtil.getSystemUserName());
-        PopulateBin(secParent,null, null);
+        populateBin(secParent,null, null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -526,7 +575,7 @@ public class DemoComponentTest
             InsureBinEmpty();
             assertTrue(true);
             trashcanCleaner.setPageLen(pl);
-            PopulateBin(null,null,null);
+            populateBin(null,null,null);
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
                     public Object doWork() throws Exception
@@ -556,7 +605,7 @@ public class DemoComponentTest
         assertNotNull(serviceRegistry);
         // empty the bin
         InsureBinEmpty();
-        PopulateBin(null,CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL );
+        populateBin(null,CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL );
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -712,13 +761,15 @@ public class DemoComponentTest
 
     }
 
-    protected void offsetNodesInBin(TransactionService transactionService)
+    protected HashSet<NodeRef> offsetNodesInBin(TransactionService transactionService)
     {
+        
         final TransactionService fTransactionService = transactionService;
-        final RetryingTransactionCallback<List<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<List<NodeRef>>()
+        final RetryingTransactionCallback<HashSet<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<HashSet<NodeRef>>()
             {
-                public List<NodeRef> execute() throws Exception
+                public HashSet<NodeRef> execute() throws Exception
                 {
+                    HashSet<NodeRef> fNodeSet = new HashSet<NodeRef>();
                     StoreRef storeRef = new StoreRef("archive://SpacesStore");
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
@@ -747,17 +798,19 @@ public class DemoComponentTest
                         {
                             policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
                         }
+                        
+                        fNodeSet.add(childAssoc.getChildRef());
 
                     }
 
-                    return null;
+                    return fNodeSet;
                 }
             };
-        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+        return AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<HashSet<NodeRef>>()
             {
-                public Object doWork() throws Exception
+                public HashSet<NodeRef> doWork() throws Exception
                 {
-                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                    return (HashSet<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
                             getArchivedNodeDateOffseted);
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -918,9 +971,94 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
 
     }
+    
+
+    protected HashSet<NodeRef> populateBinWithNodes()
+    {
+        
+        // use TransactionWork to wrap service calls in a user transaction
+        TransactionService transactionService = serviceRegistry.getTransactionService();
+        final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("workspace://SpacesStore");
+                    NodeRef workspaceRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> list = nodeService.getChildAssocs(workspaceRoot,
+                            RegexQNamePattern.MATCH_ALL,
+                            QName.createQName(NamespaceService.APP_MODEL_1_0_URI, "company_home"));
+
+                    NodeRef companyHome = list.get(0).getChildRef();
+
+                    List<NodeRef> batchOfNodes = new ArrayList<NodeRef>(NODE_CREATION_BATCH_SIZE);
+                    for (int i = 0; i < 2; i++)
+                    {
+
+                        // assign name
+                        String name = "Site-" + System.currentTimeMillis();
+
+                        SiteInfo siteInfo = siteService
+                                .createSite("site-dashboard", name, "Titre" + System.currentTimeMillis(),
+                                        "Description-" + System.currentTimeMillis(), true);
+                        batchOfNodes.add(siteInfo.getNodeRef());
+
+                    }
+                    return batchOfNodes;
+                }
+            };
+        final TransactionService fTransactionService = transactionService;
+        final List<NodeRef> batchOfnodes = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<List<NodeRef>>()
+            {
+                public List<NodeRef> doWork() throws Exception
+                {
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                            populateBinWork);
+
+                }
+            }, "admin");
+
+        // delete the batch
+        final RetryingTransactionCallback<Object> deleteWork = new RetryingTransactionCallback<Object>()
+            {
+                public List<NodeRef> execute() throws Exception
+                {
+                    for (NodeRef node : batchOfnodes)
+                    {
+                        if (nodeService.hasAspect(node, ContentModel.ASPECT_UNDELETABLE))
+                            nodeService.removeAspect(node, ContentModel.ASPECT_UNDELETABLE);
+                        nodeService.deleteNode(node);
+                    }
+
+                    return null;
+                }
+            };
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(deleteWork);
+
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+        // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or
+        // sys:archivedDate
+
+        return AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<HashSet<NodeRef>>()
+            {
+                public HashSet<NodeRef> doWork() throws Exception
+                {
+                    // return (Object)
+                    // fTransactionService.getRetryingTransactionHelper().doInTransaction(
+                    // getArchivedNodeDateOffseted);
+                    return offsetNodesInBin(fTransactionService);
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+    }
 
     
-    protected void PopulateBin(NodeRef secondParent, QName customContentType, QName customFolderType)
+    protected HashSet<NodeRef> populateBin(NodeRef secondParent, QName customContentType, QName customFolderType)
     {
         final NodeRef fSecondParent = secondParent;
         final QName fCustomContentType = customContentType;
@@ -1021,15 +1159,15 @@ public class DemoComponentTest
         // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or
         // sys:archivedDate
 
-        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+        return AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<HashSet<NodeRef>>()
             {
-                public Object doWork() throws Exception
+                public HashSet<NodeRef> doWork() throws Exception
                 {
                     // return (Object)
                     // fTransactionService.getRetryingTransactionHelper().doInTransaction(
                     // getArchivedNodeDateOffseted);
-                    offsetNodesInBin(fTransactionService);
-                    return null;
+                    return offsetNodesInBin(fTransactionService);
+                    
                 }
             }, AuthenticationUtil.getSystemUserName());
 

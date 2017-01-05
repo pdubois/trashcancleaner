@@ -67,6 +67,15 @@ shared/classes/alfresco/extention in a *-context.xml file.
 	</bean>
 ```
 
+## Protecting some specific nodes against deletion
+
+It is possible to protect some specific nodes against deletion by the trashcancleaner specifying a value for `trashcan.cleaner.nodestoskip` in  `alfresco-global.properties`. The value is a comma separated list of `nodeRef` to protect.
+
+Example:
+
+```
+trashcan.cleaner.nodestoskip=archive://SpacesStore/86936ddc-176c-4233-b5d0-647889e4bc15,archive://SpacesStore/e177ebcf-02f9-43d7-b9d7-a3118f1818e0
+```
 
 
 ## Gotcha:

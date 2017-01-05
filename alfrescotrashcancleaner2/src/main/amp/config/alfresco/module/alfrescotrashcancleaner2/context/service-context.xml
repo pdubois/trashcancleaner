@@ -59,6 +59,9 @@
 				<!-- value>{http://www.alfresco.org/model/site/1.0}site</value -->
 			</set>
 		</property>
+		<property name="nodesToSkip">
+            <value>${trashcan.cleaner.nodestoskip}</value>
+        </property>
 	</bean>
 
 	<bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">

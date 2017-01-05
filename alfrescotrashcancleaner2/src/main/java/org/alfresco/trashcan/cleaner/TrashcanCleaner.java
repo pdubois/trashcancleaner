@@ -43,6 +43,8 @@ public class TrashcanCleaner
     private TransactionService transactionService;
     private DictionaryService dictionaryService;
     private HashSet<QName> setToProtect = new HashSet<QName>();
+    private HashSet<NodeRef> nodesToSkip = new HashSet<NodeRef>();
+
     private int protectedDays = 7;
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
@@ -67,6 +69,19 @@ public class TrashcanCleaner
 
     private JobLockService jobLockService;
 
+    
+    public void setNodesToSkip(String nodesToSkip)
+    {
+        if (nodesToSkip == null || nodesToSkip.length() == 0 || nodesToSkip.startsWith("$"))
+            return;
+        this.nodesToSkip = new HashSet<NodeRef>();
+        String[] values = nodesToSkip.split(",");
+        for(String v : values)
+        {
+            this.nodesToSkip.add(new NodeRef(v));
+        }
+    }
+    
     public void setJobLockService(JobLockService jobLockService)
     {
         this.jobLockService = jobLockService;
@@ -74,6 +89,8 @@ public class TrashcanCleaner
 
     public void setSetToProtect(HashSet<String> setToProtectString)
     {
+        if (setToProtectString == null)
+            return;
         setToProtect.clear();
         // convert to QName
         for (String qStringName : setToProtectString)
@@ -146,19 +163,35 @@ public class TrashcanCleaner
     }
 
     /**
-     * Return true if type is iqual or a subtype of the type to protect
+     * Return true if type is equal or a subtype of the type to protect
      * 
      * @param type
      * @return
      */
-    protected boolean mustBeProtected(QName type)
+    protected boolean mustBeProtected(NodeRef nodeRef)
     {
+        //check the reference first then check the type
+        
+        if( this.nodesToSkip.contains(nodeRef))
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Node skiped because in nodesToSkip: " + nodeRef);
+            }
+            return true;
+        }
+        
+        QName type = nodeService.getType(nodeRef);
         Set<QName> typesToProtect = getTypesToProtect();
 
         for (QName typeToPtotect : typesToProtect)
         {
             if (typeToPtotect.equals(type) == true || dictionaryService.isSubClass(type, typeToPtotect) == true)
             {
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("Node " + nodeRef + " skiped because is type or subtype of: " + type);
+                }
                 return true;
             }
         }
@@ -369,9 +402,10 @@ public class TrashcanCleaner
                                     // if no child then delete the node, this is a leaf
                                     if (allChildren == null || allChildren.size() == 0)
                                     {
-                                        QName nodeType = nodeService.getType(nodeRef);
-                                        // maybe we need to preserve it
-                                        if (!mustBeProtected(nodeType))
+                                        
+                                        // maybe we need to preserve it if specific type
+                                        // or specific nodeRef provided in configuration
+                                        if (!mustBeProtected(nodeRef))
                                         {
                                             nodeService.deleteNode(nodeRef);
                                             return 1;
@@ -381,6 +415,8 @@ public class TrashcanCleaner
                                             fSkip.set(true);
                                             return 0; // do not delete it
                                         }
+                                        
+                                        
 
                                     }
 
