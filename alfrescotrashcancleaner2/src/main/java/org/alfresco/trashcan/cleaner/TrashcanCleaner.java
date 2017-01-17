@@ -316,15 +316,20 @@ public class TrashcanCleaner
                         GetChildrenCannedQuery cq = (GetChildrenCannedQuery) getChildrenCannedQueryFactory
                                 .getCannedQuery(archiveRoot, "*", assocTypeQNames, childTypeQNames, null, sortProps,
                                         pagingRequest);
-
+                        long queryStartExecTime = System.currentTimeMillis();
                         // execute canned query
                         CannedQueryResults<NodeRef> results = cq.execute();
 
                         if (logger.isDebugEnabled())
                         {
+                            long queryEndExecTime = System.currentTimeMillis();
+                            logger.debug("Query exec time: " + (queryEndExecTime - queryStartExecTime) + "ms");
+                            long getPageCountStart = System.currentTimeMillis();
                             logger.debug("Number of pages available:" + results.getPageCount());
+                            long getPageCountEnd = System.currentTimeMillis();
+                            logger.debug("getPageCount() exec time :" + (getPageCountEnd - getPageCountStart) + "ms");
                         }
-
+                        //by seeing the first "Delete NodeRef" we will know the getPage() time 
                         List<NodeRef> pageElements = results.getPage();
 
                         if (pageElements.size() == 0)
