@@ -2,6 +2,6 @@
     <shortname>Javascript Sample Webscript</shortname>
     <description>Hands back a greeting</description>
     <url>/sample/helloworld</url>
-    <authentication>user</authentication>
+    <authentication>admin</authentication>
     <format default="html"></format>
 </webscript>

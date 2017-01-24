@@ -12,13 +12,13 @@ import org.springframework.extensions.webscripts.WebScriptRequest;
 import org.springframework.extensions.webscripts.WebScriptResponse;
 
 /**
- * Webscript returning information on trashcan cleaner
+ * Webscript disabling trashcan
  * @author Philippe
  *
  */
-public class GetStatus extends AbstractWebScript
+public class Enable extends AbstractWebScript
 {
-    private static final Log logger = LogFactory.getLog(GetStatus.class);
+    private static final Log logger = LogFactory.getLog(Enable.class);
 
     private TrashcanCleaner trashcanCleaner;
     
@@ -33,7 +33,7 @@ public class GetStatus extends AbstractWebScript
             JSONObject jResult = new JSONObject();
             try
             {
-                jResult.put("STATUS", trashcanCleaner.getStatus());
+                jResult.put("OLDSTATUS", trashcanCleaner.Enable());
             }
             catch (JSONException e1)
             {

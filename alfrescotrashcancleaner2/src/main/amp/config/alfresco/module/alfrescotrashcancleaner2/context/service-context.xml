@@ -62,6 +62,9 @@
 		<property name="nodesToSkip">
             <value>${trashcan.cleaner.nodestoskip}</value>
         </property>
+        <property name="cleanerMaxRunningTime">
+            <value>${trashcan.cleaner.cleanermaxrunningtime}</value>
+        </property>
 	</bean>
 
 	<bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">

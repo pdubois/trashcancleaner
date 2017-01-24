@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.alfresco.model.ContentModel;
@@ -49,10 +51,26 @@ public class TrashcanCleaner
     private StoreRef storeRef;
     private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
     private int pageLen = 3;
+    
+    // contains when cleaner started
+    private long startTime = 0L;
+    // contains how long runner can work maximum.
+    // default is 4 hours
+    private long cleanerMaxRunningTime = 1000L * 60L * 60L * 4L;
+
+    public void setCleanerMaxRunningTime(long cleanerMaxRunningTime)
+    {
+        this.cleanerMaxRunningTime = cleanerMaxRunningTime;
+    }
+    
+    public long getCleanerMaxRunningTime(long cleanerMaxRunningTime)
+    {
+        return this.cleanerMaxRunningTime;
+    }
 
     public enum Status
     {
-        RUNNING, STOPPED
+        RUNNING, STOPPING, STOPPED, DISABLED
     }
 
     private Status status = Status.STOPPED;
@@ -61,7 +79,58 @@ public class TrashcanCleaner
     {
         return status;
     }
+    
+    /**
+     * Set status to STOPPING if status is RUNNING
+     * @return previous status
+     */
+    public Status stop()
+    {
+        
+        Status previousStatus = getStatus();
+        if (status == Status.RUNNING)
+        {
+            status = Status.STOPPING;
+        }
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("stop called, previous status: " + previousStatus);
+        }
+        return previousStatus;
+    }
+    
+    /**
+     * It stops current execution.
+     * @return
+     */
+    public Status Disable()
+    {
+        Status previousStatus = this.getStatus();
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("stop called, previous status: " + previousStatus);
+        }
+        status = Status.DISABLED;
+        return previousStatus;
+    }
 
+    /**
+     * It enables current execution.
+     * @return
+     */
+    public Status Enable()
+    {
+        Status previousStatus = this.getStatus();
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("Enable called, previous status: " + previousStatus);
+        }
+        status = Status.STOPPED;
+        return previousStatus;
+    }
+
+    
+    
     public void setPageLen(int pageLen)
     {
         this.pageLen = pageLen;
@@ -202,6 +271,7 @@ public class TrashcanCleaner
         final NodeRef fNodeREf = nodeRef;
         final MutableBoolean fSkip = skip;
         final int fMaxNumOfNodesInTransaction = maxNumOfNodesInTransaction;
+        final TrashcanCleaner fThis = this;
         final RetryingTransactionCallback<Integer> recursiveWork = new RetryingTransactionCallback<Integer>()
             {
                 public Integer execute() throws Exception
@@ -232,6 +302,8 @@ public class TrashcanCleaner
                 {
                     if (!nodeService.exists(nodeRef))
                         return 0; // finished
+                    if (fThis.getStatus() == Status.STOPPING || fThis.getStatus() == Status.DISABLED)
+                        return 0;
                     List<ChildAssociationRef> allChildren = nodeService.getChildAssocs(nodeRef);
 
                     // if no child then delete the node, this is a leaf
@@ -273,7 +345,21 @@ public class TrashcanCleaner
     public void execute()
     {
         String lockToken = null;
+        TimerTask stopTask = null;
+        Timer timer = new Timer();
+        final TrashcanCleaner fThis = this;
         final AtomicBoolean keepGoing = new AtomicBoolean(true);
+        
+        
+        if (this.getStatus() == Status.DISABLED ||  this.getStatus() == Status.RUNNING)
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Trashcan RUNNING or DISABLET: " + this.getStatus());
+            }
+            return;
+        }
+        
         try
         {
             if (logger.isDebugEnabled())
@@ -309,13 +395,32 @@ public class TrashcanCleaner
                     }
                 };
             jobLockService.refreshLock(lockToken, LOCK_QNAME, LOCK_TTL, callback);
-
             status = Status.RUNNING;
+            
+            //start a timer to stop after getCleanerMaxRunningTime();
+            stopTask = new TimerTask()
+            { 
+
+
+                public void run()
+                {
+                    Status previousStatus = fThis.stop(); 
+                    if (logger.isDebugEnabled())
+                    {
+                        logger.debug("Stopping Timer task called, previous status" + previousStatus);
+                    }
+                }
+            };
+            
+          //sched(TimerTask task, long time, long period)
+          // scheduleAtFixedRate(TimerTask task, long delay, long period)
+          timer.scheduleAtFixedRate(stopTask,this.cleanerMaxRunningTime, this.cleanerMaxRunningTime); 
+            
+            this.startTime = System.currentTimeMillis();
             if (logger.isDebugEnabled())
             {
                 logger.debug("Before Execute internal !");
             }
-
             executeLocalInternal();
             if (logger.isDebugEnabled())
             {
@@ -339,16 +444,19 @@ public class TrashcanCleaner
             {
                 logger.debug("Finally before released lock !!");
             }
+            timer.cancel();
             keepGoing.set(false); // Notify the refresh callback that we are done
             if (lockToken != null)
             {
                 jobLockService.releaseLock(lockToken, LOCK_QNAME);
-                status = Status.STOPPED;
+                if (status != status.DISABLED)
+                   status = Status.STOPPED;
                 if (logger.isDebugEnabled())
                 {
                     logger.debug("After released lock !!");
                 }
             }
+
         }
     }
 
@@ -371,8 +479,8 @@ public class TrashcanCleaner
 
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     // get canned query
-                    //It could be the sort slowing down
-                    //set org.alfresco.repo.node.getchildren.GetChildrenCannedQuery=debug to get query exec time
+                    //log4j.logger.org.alfresco.trashcan.cleaner.TrashcanCleaner=debug
+                    //log4j.logger.org.alfresco.repo.node.getchildren.GetChildrenCannedQuery=debug
                     GetChildrenCannedQueryFactory getChildrenCannedQueryFactory = (GetChildrenCannedQueryFactory) cannedQueryRegistry
                             .getNamedObject(CANNED_QUERY_FILEFOLDER_LIST);
 
@@ -418,6 +526,8 @@ public class TrashcanCleaner
             int iteration = 1;
             do
             {
+                if( this.getStatus() == Status.STOPPING || this.getStatus() == Status.DISABLED)
+                    break;
                 if (logger.isDebugEnabled())
                 {
                     logger.debug("iteration =" + iteration);
@@ -430,6 +540,8 @@ public class TrashcanCleaner
                 // display the page
                 for (NodeRef nodeRef : pageElements)
                 {
+                    if( this.getStatus() == Status.STOPPING || this.getStatus() == Status.DISABLED )
+                        break;
                     Date archivedDate = (Date) nodeService
                             .getProperty(nodeRef, ContentModel.PROP_ARCHIVED_DATE);
                     //here we are testing the case if some node are in archive but not having ContentModel.PROP_ARCHIVED_DATE
@@ -450,7 +562,7 @@ public class TrashcanCleaner
                     // Maybe there is more than one element to deleted there
                     // It might be a big tree and therefore causing/requiring big or even too big transaction
                     MutableBoolean fSkipBool = new MutableBoolean(false);
-                    while (deleteRecursive(nodeRef, 500, fSkipBool) != 0)
+                    while (this.getStatus() != Status.STOPPING && this.getStatus() != Status.DISABLED && deleteRecursive(nodeRef, 500, fSkipBool) != 0)
                     {
                     }
                     // it true we have a tree that was pruned but containing

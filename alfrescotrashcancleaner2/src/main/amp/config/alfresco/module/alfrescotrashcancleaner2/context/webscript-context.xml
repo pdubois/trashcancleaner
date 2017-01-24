@@ -12,9 +12,51 @@
 	language governing permissions and limitations under the License. -->
 <beans>
 
-    <bean id="webscript.getstatus.get" class="org.alfresco.trashcan.webscripts.GetStatus"
+	<bean id="webscript.org.alfresco.getstatus.get" class="org.alfresco.trashcan.webscripts.GetStatus"
+		parent="webscript">
+		<property name="trashcanCleaner">
+			<ref bean="trashcanCleaner" />
+		</property>
+	</bean>
+	
+	<bean id="webscript.org.alfresco.disable.get" class="org.alfresco.trashcan.webscripts.Disable"
         parent="webscript">
- 
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
     </bean>
-   
+    
+    <bean id="webscript.org.alfresco.enable.get" class="org.alfresco.trashcan.webscripts.Enable"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+    </bean>
+    
+    <bean id="webscript.org.alfresco.populatebin.get" class="org.alfresco.trashcan.webscripts.PopulateBin"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+        <property name="nodeService">
+            <ref bean="nodeService" />
+        </property>
+        <property name="serviceRegistry">
+            <ref bean="ServiceRegistry" />
+        </property>
+        <property name="policyBehaviourFilter">
+            <ref bean="policyBehaviourFilter" />
+        </property>
+    </bean>
+
+    <!-- bean id="webscript.org.alfresco.comparetool.get" class="org.alfresco.fixssd.CompareTool"
+        parent="webscript">
+        <property name="cloudConnectorService" ref="CloudConnectorService" />
+        <property name="remoteConnectorService" ref="RemoteConnectorService" />
+        <property name="nodeService" ref="nodeService" />
+        <property name="syncCloudUrl">
+            <value>${sync.cloud.url}</value>
+        </property>
+    </bean -->
+
 </beans>

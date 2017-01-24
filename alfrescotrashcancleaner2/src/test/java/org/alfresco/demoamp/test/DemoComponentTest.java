@@ -48,6 +48,7 @@ import org.springframework.scheduling.quartz.JobDetailBean;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.google.gdata.data.youtube.YtRelationship.Status;
 import com.tradeshift.test.remote.Remote;
 import com.tradeshift.test.remote.RemoteTestRunner;
 
@@ -72,7 +73,7 @@ public class DemoComponentTest
     private static final String CUSTOM_CONTENT_URI = "custom.model";
     private static final QName CUSTOM_CONTENT_MODEL = QName.createQName(CUSTOM_CONTENT_URI, "mycontent");
     private static final QName CUSTOM_FOLDER_MODEL = QName.createQName(CUSTOM_CONTENT_URI, "myfolder");
-    
+
     static Logger log = Logger.getLogger(DemoComponentTest.class);
 
     @Autowired
@@ -106,8 +107,6 @@ public class DemoComponentTest
     @Autowired
     @Qualifier("trashcanCleanerJobDetail")
     JobDetailBean trashcanCleanerJobDetail;
-    
-
 
     @Test
     public void testPurgeBinWithSites()
@@ -144,14 +143,14 @@ public class DemoComponentTest
     {
         assertNotNull(serviceRegistry);
         InsureBinEmpty();
-        HashSet<NodeRef> nodesInTheBin= populateBin(null, null, null);
+        HashSet<NodeRef> nodesInTheBin = populateBin(null, null, null);
         System.out.println("******* nodesInTheBin = " + nodesInTheBin.size());
-        StringBuffer  sb = new StringBuffer();
+        StringBuffer sb = new StringBuffer();
         int i = 0;
         int numToDel = 0;
         for (NodeRef nr : nodesInTheBin)
         {
-            if (i%2 == 0)
+            if (i % 2 == 0)
             {
 
                 if (sb.length() == 0)
@@ -166,7 +165,7 @@ public class DemoComponentTest
             }
             else
             {
-                numToDel++; 
+                numToDel++;
             }
             i++;
         }
@@ -187,16 +186,15 @@ public class DemoComponentTest
                     trashcanCleaner.execute();
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
                     // none should be delete because they are all sites
-                    System.out.println("******* childAssocs.size()-fnumToDel = " + (childAssocs.size()-fnumToDel));
+                    System.out.println("******* childAssocs.size()-fnumToDel = " + (childAssocs.size() - fnumToDel));
                     System.out.println("******* childAssocAfter.size() = " + childAssocAfter.size());
-                    assertEquals(childAssocs.size()-fnumToDel, childAssocAfter.size());
+                    assertTrue(childAssocs.size() - fnumToDel <= childAssocAfter.size());
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
 
     }
-    
-    
+
     @Test
     public void testPurgeBinWithNoArchivedAspectProps()
     {
@@ -205,10 +203,10 @@ public class DemoComponentTest
         trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
-        populateBin(null,null,null);
+        populateBin(null, null, null);
         final TransactionService fTransactionService = serviceRegistry.getTransactionService();
 
-        RemoveAspectArchivedInBin(fTransactionService, 10); //Those 10 should be preserved from deletion
+        RemoveAspectArchivedInBin(fTransactionService, 10); // Those 10 should be preserved from deletion
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -230,9 +228,6 @@ public class DemoComponentTest
 
     }
 
-    
-    
-    
     @Test
     public void testPurgeBinBigTreeDirect()
     {
@@ -333,8 +328,8 @@ public class DemoComponentTest
 
                 do
                 {
-                    System.out
-                            .println("*********************************************************************Before SLEEP");
+                    System.out.println(
+                            "*********************************************************************Before SLEEP");
                     try
                     {
                         Thread.sleep(4000L);
@@ -369,6 +364,102 @@ public class DemoComponentTest
                 e.printStackTrace();
             }
         }
+        System.out.println("*********************************************************************VERIFIED");
+
+    }
+
+    /**
+     * Test that that trashcanCleaner can be disabled
+     */
+    @Test
+    public void testPurgeBinBigTreeDisabled()
+    {
+        assertNotNull(serviceRegistry);
+        HashSet<String> typeToProtect = new HashSet<String>();
+        trashcanCleaner.setSetToProtect(typeToProtect);
+        // empty the bin
+        InsureBinEmpty();
+
+        PopulateBinWithBigTree(null);
+        System.out.println("After PopulateBinWithBigTree!");
+
+        try
+        {
+            // configure the scheduler time
+            SimpleTrigger trigger = new SimpleTrigger();
+            trigger.setName("TESTTRIGGER");
+            trigger.setStartTime(new Date(System.currentTimeMillis() + 1000L));
+            trigger.setRepeatInterval(1);
+            // only execute once
+            trigger.setRepeatCount(1);
+
+            // schedule it
+            Scheduler scheduler = new StdSchedulerFactory().getScheduler();
+            scheduler.start();
+            scheduler.scheduleJob(trashcanCleanerJobDetail, trigger);
+            System.out.println("Before starting !!!");
+            // wait
+            try
+            {
+                Thread.sleep(4000L);
+            }
+            catch (InterruptedException e1)
+            {
+            }
+
+            // expected status here is RUNNING
+            assert (trashcanCleaner.getStatus() == TrashcanCleaner.Status.RUNNING);
+            TrashcanCleaner.Status prevStatus = trashcanCleaner.Disable();
+            assert (trashcanCleaner.getStatus() == TrashcanCleaner.Status.DISABLED);
+
+            System.out.println("*********************************************************************Before SLEEP");
+            try
+            {
+                Thread.sleep(4000L);
+            }
+            catch (InterruptedException e1)
+            {
+            }
+            
+            //check that status is disable still
+            assert (trashcanCleaner.getStatus() == TrashcanCleaner.Status.DISABLED);
+            populateBin(null, null, null);
+            populateBin(null, null, null);
+            populateBin(null, null, null);
+            System.out.println("*********************************************************************Finished");
+            //check that it does nothing still disabled.
+            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+                {
+                    public Object doWork() throws Exception
+                    {
+                        // try to count number of elements in the bin
+                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        childAssocs = nodeService.getChildAssocs(archiveRoot);
+                        
+                        int numOElemInBinBefore =  childAssocs.size();
+                        
+                        trashcanCleaner.execute();
+                        
+                        childAssocs = nodeService.getChildAssocs(archiveRoot);
+                        assertEquals(childAssocs.size(), numOElemInBinBefore);
+                        return null;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+
+        }
+        catch (Exception e)
+        {
+            // TODO Auto-generated catch block
+            // fail(e.getMessage());
+            e.printStackTrace();
+        }
+        finally{
+            trashcanCleaner.Enable();
+        }
+
         System.out.println("*********************************************************************VERIFIED");
 
     }
@@ -422,7 +513,7 @@ public class DemoComponentTest
             Scheduler scheduler = new StdSchedulerFactory().getScheduler();
             scheduler.start();
             scheduler.scheduleJob(trashcanCleanerJobDetail, trigger);
-            
+
             try
             {
                 Thread.sleep(2000L);
@@ -430,29 +521,29 @@ public class DemoComponentTest
             catch (InterruptedException e1)
             {
             }
-            
-            System.out.println("Before starting !!!");
-            
-            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
-                    {
-                        public Object doWork() throws Exception
-                        {
-                            // try to count number of elements in the bin
-                            StoreRef storeRef = new StoreRef("archive://SpacesStore");
-                            NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                            List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                            // test if purge deleted all the elements from the
-                            // bin
-                            //Returns immediately
-                            long before = System.currentTimeMillis();
-                            trashcanCleaner.execute();
-                            long after = System.currentTimeMillis();                            
-                            assert(after - before < 500);
-                            return null;
-                        }
-                    }, AuthenticationUtil.getSystemUserName());
-            
+            System.out.println("Before starting !!!");
+
+            AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+                {
+                    public Object doWork() throws Exception
+                    {
+                        // try to count number of elements in the bin
+                        StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                        NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                        List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+
+                        // test if purge deleted all the elements from the
+                        // bin
+                        // Returns immediately
+                        long before = System.currentTimeMillis();
+                        trashcanCleaner.execute();
+                        long after = System.currentTimeMillis();
+                        assert (after - before < 500);
+                        return null;
+                    }
+                }, AuthenticationUtil.getSystemUserName());
+
             // Should be running here
             // trashcanCleaner.getStatus();
 
@@ -524,7 +615,7 @@ public class DemoComponentTest
                     return secParent;
                 }
             }, AuthenticationUtil.getSystemUserName());
-        populateBin(secParent,null, null);
+        populateBin(secParent, null, null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -575,7 +666,7 @@ public class DemoComponentTest
             InsureBinEmpty();
             assertTrue(true);
             trashcanCleaner.setPageLen(pl);
-            populateBin(null,null,null);
+            populateBin(null, null, null);
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
                     public Object doWork() throws Exception
@@ -597,15 +688,14 @@ public class DemoComponentTest
         }
 
     }
-    
-    
+
     @Test
     public void testPurgeBinWithCustomTypes()
     {
         assertNotNull(serviceRegistry);
         // empty the bin
         InsureBinEmpty();
-        populateBin(null,CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL );
+        populateBin(null, CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -614,13 +704,13 @@ public class DemoComponentTest
                     StoreRef storeRef = new StoreRef("archive://SpacesStore");
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-                    //test if purge deleted all the elements from the bin
-                    System.out.println("**** Child Assoc Before: " +  childAssocs.size());
+                    // test if purge deleted all the elements from the bin
+                    System.out.println("**** Child Assoc Before: " + childAssocs.size());
                     trashcanCleaner.execute();
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
-                    System.out.println("**** Child Assoc Before: " +  childAssocAfter.size());
+                    System.out.println("**** Child Assoc Before: " + childAssocAfter.size());
                     // Should all be deleted because not custom type
-                    assertEquals(childAssocs.size() - NUM_OF_DELETED, childAssocAfter.size() );
+                    assertEquals(childAssocs.size() - NUM_OF_DELETED, childAssocAfter.size());
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -719,8 +809,8 @@ public class DemoComponentTest
             {
                 public List<NodeRef> doWork() throws Exception
                 {
-                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            populateBinWork);
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(populateBinWork);
 
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -763,7 +853,7 @@ public class DemoComponentTest
 
     protected HashSet<NodeRef> offsetNodesInBin(TransactionService transactionService)
     {
-        
+
         final TransactionService fTransactionService = transactionService;
         final RetryingTransactionCallback<HashSet<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<HashSet<NodeRef>>()
             {
@@ -798,7 +888,7 @@ public class DemoComponentTest
                         {
                             policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
                         }
-                        
+
                         fNodeSet.add(childAssoc.getChildRef());
 
                     }
@@ -810,14 +900,15 @@ public class DemoComponentTest
             {
                 public HashSet<NodeRef> doWork() throws Exception
                 {
-                    return (HashSet<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            getArchivedNodeDateOffseted);
+                    return (HashSet<NodeRef>) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(getArchivedNodeDateOffseted);
                 }
             }, AuthenticationUtil.getSystemUserName());
     }
 
     /**
      * Remove the aspect ASPECT_ARCHIVED
+     * 
      * @param transactionService
      * @param numOfNodesToRemoveAspect
      */
@@ -838,7 +929,7 @@ public class DemoComponentTest
                         if (i > fNNumOfNodesToRemoveAspect)
                             break;
                         i++;
-                        
+
                         nodeService.removeAspect(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED);
 
                     }
@@ -850,14 +941,12 @@ public class DemoComponentTest
             {
                 public Object doWork() throws Exception
                 {
-                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            getArchivedNodeDateOffseted);
+                    return (Object) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(getArchivedNodeDateOffseted);
                 }
             }, AuthenticationUtil.getSystemUserName());
     }
 
-    
-    
     protected void InsureBinEmpty()
     {
         // use TransactionWork to wrap service calls in a user transaction
@@ -911,9 +1000,9 @@ public class DemoComponentTest
                         // assign name
                         String name = "Site-" + System.currentTimeMillis();
 
-                        SiteInfo siteInfo = siteService
-                                .createSite("site-dashboard", name, "Titre" + System.currentTimeMillis(),
-                                        "Description-" + System.currentTimeMillis(), true);
+                        SiteInfo siteInfo = siteService.createSite("site-dashboard", name,
+                                "Titre" + System.currentTimeMillis(), "Description-" + System.currentTimeMillis(),
+                                true);
                         batchOfNodes.add(siteInfo.getNodeRef());
 
                     }
@@ -925,8 +1014,8 @@ public class DemoComponentTest
             {
                 public List<NodeRef> doWork() throws Exception
                 {
-                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            populateBinWork);
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(populateBinWork);
 
                 }
             }, "admin");
@@ -971,11 +1060,10 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
 
     }
-    
 
     protected HashSet<NodeRef> populateBinWithNodes()
     {
-        
+
         // use TransactionWork to wrap service calls in a user transaction
         TransactionService transactionService = serviceRegistry.getTransactionService();
         final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
@@ -997,9 +1085,9 @@ public class DemoComponentTest
                         // assign name
                         String name = "Site-" + System.currentTimeMillis();
 
-                        SiteInfo siteInfo = siteService
-                                .createSite("site-dashboard", name, "Titre" + System.currentTimeMillis(),
-                                        "Description-" + System.currentTimeMillis(), true);
+                        SiteInfo siteInfo = siteService.createSite("site-dashboard", name,
+                                "Titre" + System.currentTimeMillis(), "Description-" + System.currentTimeMillis(),
+                                true);
                         batchOfNodes.add(siteInfo.getNodeRef());
 
                     }
@@ -1011,8 +1099,8 @@ public class DemoComponentTest
             {
                 public List<NodeRef> doWork() throws Exception
                 {
-                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            populateBinWork);
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(populateBinWork);
 
                 }
             }, "admin");
@@ -1057,13 +1145,12 @@ public class DemoComponentTest
 
     }
 
-    
     protected HashSet<NodeRef> populateBin(NodeRef secondParent, QName customContentType, QName customFolderType)
     {
         final NodeRef fSecondParent = secondParent;
         final QName fCustomContentType = customContentType;
         final QName fCustomFolderTypee = customFolderType;
-        
+
         // use TransactionWork to wrap service calls in a user transaction
         TransactionService transactionService = serviceRegistry.getTransactionService();
         final RetryingTransactionCallback<List<NodeRef>> populateBinWork = new RetryingTransactionCallback<List<NodeRef>>()
@@ -1115,7 +1202,7 @@ public class DemoComponentTest
                             nodeService.addChild(fSecondParent, content, ContentModel.ASSOC_CONTAINS,
                                     QName.createQName(NamespaceService.CONTENT_MODEL_PREFIX, name));
                         }
-                        
+
                         if (fCustomContentType != null)
                             nodeService.setType(content, fCustomContentType);
                         batchOfNodes.add(content);
@@ -1128,8 +1215,8 @@ public class DemoComponentTest
             {
                 public List<NodeRef> doWork() throws Exception
                 {
-                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper().doInTransaction(
-                            populateBinWork);
+                    return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper()
+                            .doInTransaction(populateBinWork);
 
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -1167,7 +1254,7 @@ public class DemoComponentTest
                     // fTransactionService.getRetryingTransactionHelper().doInTransaction(
                     // getArchivedNodeDateOffseted);
                     return offsetNodesInBin(fTransactionService);
-                    
+
                 }
             }, AuthenticationUtil.getSystemUserName());
 

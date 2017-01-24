@@ -2,8 +2,10 @@
   <shortname>getstatus</shortname>
   <description>Get  status of trashcan</description>
   <url>/trashcan/getstatus</url>
-  <authentication>user</authentication>
+  <authentication>admin</authentication>
   <transaction>required</transaction>
-  <format default="json">argument</format>
+  <format default="">argument</format>
   <family>Alfresco Java-Backed WebScripts getting status</family>
 </webscript>
+
+
