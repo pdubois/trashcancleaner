@@ -82,7 +82,7 @@ Execution time of the cleaner can be configured specifying `trashcan.cleaner.cle
 
 Example:
 
-```### run 4 hours max (1000*60*60*4)
+```
 trashcan.cleaner.cleanermaxrunningtime=14400000
 ```
 
@@ -91,64 +91,13 @@ trashcan.cleaner.cleanermaxrunningtime=14400000
 Example:
 
 ```
-curl -v "http://localhost:8080/alfresco/service/api/login?u=admin&pw=<your pw>"
-* About to connect() to localhost port 8080 (#0)
-*   Trying 127.0.0.1... connected
-> GET /alfresco/service/api/login?u=admin&pw=admin HTTP/1.1
-> User-Agent: curl/7.22.0 (x86_64-pc-linux-gnu) libcurl/7.22.0 OpenSSL/1.0.1 zlib/1.2.3.4 libidn/1.23 librtmp/2.3
-> Host: localhost:8080
-> Accept: */*
-> 
-< HTTP/1.1 200 OK
-< Server: Apache-Coyote/1.1
-< Cache-Control: no-cache
-< Expires: Thu, 01 Jan 1970 00:00:00 GMT
-< Pragma: no-cache
-< Content-Type: text/xml;charset=UTF-8
-< Content-Length: 104
-< Date: Tue, 24 Jan 2017 14:40:27 GMT
-< 
-<?xml version="1.0" encoding="UTF-8"?>
-<ticket>TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9</ticket>
-* Connection #0 to host localhost left intact
-* Closing connection #0
+ curl -v http://localhost:8080/alfresco/service/api/login?u=admin&pw=<your pw>
+ curl -v http://127.0.0.1:8080/alfresco/s/trashcan/disable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9
+ curl -v http://127.0.0.1:8080/alfresco/s/trashcan/enable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9
 
-curl -v "http://127.0.0.1:8080/alfresco/s/trashcan/disable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9"
-* About to connect() to 127.0.0.1 port 8080 (#0)
-*   Trying 127.0.0.1... connected
-> GET /alfresco/s/trashcan/disable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9 HTTP/1.1
-> User-Agent: curl/7.22.0 (x86_64-pc-linux-gnu) libcurl/7.22.0 OpenSSL/1.0.1 zlib/1.2.3.4 libidn/1.23 librtmp/2.3
-> Host: 127.0.0.1:8080
-> Accept: */*
-> 
-< HTTP/1.1 200 OK
-< Server: Apache-Coyote/1.1
-< Content-Length: 23
-< Date: Tue, 24 Jan 2017 14:43:33 GMT
-< 
-* Connection #0 to host 127.0.0.1 left intact
-* Closing connection #0
-{"OLDSTATUS":"RUNNING"}
-
-curl -v "http://127.0.0.1:8080/alfresco/s/trashcan/enable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9"
-* About to connect() to 127.0.0.1 port 8080 (#0)
-*   Trying 127.0.0.1... connected
-> GET /alfresco/s/trashcan/enable?alf_ticket=TICKET_0f96c193bd3f088c87cb5bbbcd663e55a373f0b9 HTTP/1.1
-> User-Agent: curl/7.22.0 (x86_64-pc-linux-gnu) libcurl/7.22.0 OpenSSL/1.0.1 zlib/1.2.3.4 libidn/1.23 librtmp/2.3
-> Host: 127.0.0.1:8080
-> Accept: */*
-> 
-< HTTP/1.1 200 OK
-< Server: Apache-Coyote/1.1
-< Content-Length: 24
-< Date: Tue, 24 Jan 2017 14:45:13 GMT
-< 
-* Connection #0 to host 127.0.0.1 left intact
-* Closing connection #0
-{"OLDSTATUS":"DISABLED"}
 ```
 
-Note: disable might take a bit of time depending how fast query retrieving elements to get rid of performs.
+Note: disable might take a bit of time depending how fast query retrieving elements to get rid of performs. You need to use ticket returned while executing first line in the example above.
 
 ### Example of properties that must be defined in alfresco-global.properties
 
