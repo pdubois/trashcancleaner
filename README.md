@@ -35,7 +35,7 @@ shared/classes/alfresco/extention in a *-context.xml file.
 ### Example:
 
 ```
-<bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
+	<bean id="trashcanCleaner" class="org.alfresco.trashcan.cleaner.TrashcanCleaner">
 		<property name="nodeService">
 			<ref bean="nodeService" />
 		</property>
@@ -45,25 +45,32 @@ shared/classes/alfresco/extention in a *-context.xml file.
 		<property name="protectedDays">
 			<value>${trashcan.cleaner.protected.day}</value>
 		</property>
-		<property name="storeUrl">
-			<value>archive://SpacesStore</value>
-		</property>
 		<property name="dictionaryService">
 			<ref bean="DictionaryService" />
 		</property>
-		<property name="cannedQueryRegistry">
-			<ref bean="fileFolderCannedQueryRegistry" />
-		</property>
+		<property name="jobLockService">
+            <ref bean="jobLockService" />
+        </property>
+        <property name="searchService">
+            <ref bean="searchService" />
+        </property>
 		<property name="pageLen" value="${trashcan.cleaner.pagelen}" />
 		<!-- Set of type that must be protected from deletetion -->
 		<!-- results in a setAddressSet(java.util.Set) call -->
 		<property name="setToProtect">
 			<set>
 			    <!-- Example: QName of type to protect -->
-			    <!-- Long version of the prefix QName must be used -->
-				<value>{http://www.alfresco.org/model/site/1.0}site</value>
+				<!-- value>{http://www.alfresco.org/model/site/1.0}site</value -->
+				<!-- THIS TYPE MUSE ALWAYS BE PROTECTED: {http://www.alfresco.org/model/system/1.0}archiveUser -->
+				<value>{http://www.alfresco.org/model/system/1.0}archiveUser</value>
 			</set>
 		</property>
+		<property name="nodesToSkip">
+            <value>${trashcan.cleaner.nodestoskip}</value>
+        </property>
+        <property name="cleanerMaxRunningTime">
+            <value>${trashcan.cleaner.cleanermaxrunningtime}</value>
+        </property>
 	</bean>
 ```
 

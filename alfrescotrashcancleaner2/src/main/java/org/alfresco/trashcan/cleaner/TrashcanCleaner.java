@@ -1,5 +1,6 @@
 package org.alfresco.trashcan.cleaner;
 
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -10,46 +11,43 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.alfresco.model.ContentModel;
-import org.alfresco.query.CannedQueryFactory;
-import org.alfresco.query.CannedQueryResults;
-import org.alfresco.query.PagingRequest;
 import org.alfresco.repo.lock.JobLockService;
 import org.alfresco.repo.lock.JobLockService.JobLockRefreshCallback;
 import org.alfresco.repo.lock.LockAcquisitionException;
-import org.alfresco.repo.model.filefolder.GetChildrenCannedQueryFactory;
-import org.alfresco.repo.node.getchildren.GetChildrenCannedQuery;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
 import org.alfresco.service.cmr.dictionary.DictionaryService;
 import org.alfresco.service.cmr.repository.ChildAssociationRef;
 import org.alfresco.service.cmr.repository.NodeRef;
 import org.alfresco.service.cmr.repository.NodeService;
 import org.alfresco.service.cmr.repository.StoreRef;
+import org.alfresco.service.cmr.search.ResultSet;
+import org.alfresco.service.cmr.search.SearchParameters;
+import org.alfresco.service.cmr.search.SearchService;
 import org.alfresco.service.namespace.NamespaceService;
 import org.alfresco.service.namespace.QName;
 import org.alfresco.service.transaction.TransactionService;
-import org.alfresco.trashcan2.CleanerComponent;
-import org.alfresco.util.Pair;
-import org.alfresco.util.registry.NamedObjectRegistry;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 public class TrashcanCleaner
 {
+
+    // private static final String ARCHIVE_SEARCH_STRING = "ASPECT:\"sys:archived\" AND TYPE:\"cm:content\"";
+    private static final String ARCHIVE_SEARCH_STRING = "ASPECT:\"sys:archived\" ";
     private static final long LOCK_TTL = 30000L; // 30 sec
     private static final QName LOCK_QNAME = QName.createQName(NamespaceService.SYSTEM_MODEL_1_0_URI,
             "org.alfresco.repo.TrashcanCleaner");
-    private static final String CANNED_QUERY_FILEFOLDER_LIST = "fileFolderGetChildrenCannedQueryFactory";
     private static Log logger = LogFactory.getLog(TrashcanCleaner.class);
 
     private NodeService nodeService;
     private TransactionService transactionService;
     private DictionaryService dictionaryService;
     private HashSet<QName> setToProtect = new HashSet<QName>();
+
     private HashSet<NodeRef> nodesToSkip = new HashSet<NodeRef>();
 
+
     private int protectedDays = 7;
-    private StoreRef storeRef;
-    private NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry;
     private int pageLen = 3;
     
     // contains when cleaner started
@@ -57,6 +55,18 @@ public class TrashcanCleaner
     // contains how long runner can work maximum.
     // default is 4 hours
     private long cleanerMaxRunningTime = 1000L * 60L * 60L * 4L;
+    
+    private SearchService searchService;
+
+    public TrashcanCleaner()
+    {
+        setToProtect.add(QName.createQName("{http://www.alfresco.org/model/site/1.0}site"));
+    }
+
+    public void setSearchService(SearchService searchService)
+    {
+        this.searchService = searchService;
+    }
 
     public void setCleanerMaxRunningTime(long cleanerMaxRunningTime)
     {
@@ -159,26 +169,25 @@ public class TrashcanCleaner
     public void setSetToProtect(HashSet<String> setToProtectString)
     {
         if (setToProtectString == null)
+        {
+            
+            setToProtect.clear();
+            setToProtect.add(QName.createQName("{http://www.alfresco.org/model/site/1.0}site"));
             return;
-        setToProtect.clear();
+        }
+
+
         // convert to QName
         for (String qStringName : setToProtectString)
         {
             setToProtect.add(QName.createQName(qStringName));
         }
+        setToProtect.add(QName.createQName("{http://www.alfresco.org/model/site/1.0}site"));
     }
 
     public void setDictionaryService(DictionaryService dictionaryService)
     {
         this.dictionaryService = dictionaryService;
-    }
-
-    /**
-     * Set the registry of {@link CannedQueryFactory canned queries}
-     */
-    public void setCannedQueryRegistry(NamedObjectRegistry<CannedQueryFactory<NodeRef>> cannedQueryRegistry)
-    {
-        this.cannedQueryRegistry = cannedQueryRegistry;
     }
 
     /**
@@ -226,10 +235,6 @@ public class TrashcanCleaner
         }
     }
 
-    public void setStoreUrl(String storeUrl)
-    {
-        this.storeRef = new StoreRef(storeUrl);
-    }
 
     /**
      * Return true if type is equal or a subtype of the type to protect
@@ -266,6 +271,8 @@ public class TrashcanCleaner
         }
         return false;
     }
+    
+    
     int deleteRecursive(NodeRef nodeRef, int maxNumOfNodesInTransaction, MutableBoolean skip)
     {
         final NodeRef fNodeREf = nodeRef;
@@ -287,14 +294,28 @@ public class TrashcanCleaner
                         fSkip.set(true);
                         return 0; // do not delete it
                     }
+                    if (mustBeProtected(fNodeREf))
+                    {
+                        logger.warn("Node type protected: " + fNodeREf );
+                        fSkip.set(true);
+                        return 0;
+                    }
+                    
                     //also testing ContentModel.PROP_ARCHIVED_DATE != null
-                    if(nodeService.getProperty(fNodeREf, ContentModel.PROP_ARCHIVED_DATE)== null)
+                    Date archiveDate = (Date)nodeService.getProperty(fNodeREf, ContentModel.PROP_ARCHIVED_DATE);
+                    Date toDate = new Date(new Date().getTime() - (1000L * 60L * 60L * 24L * protectedDays));
+                    //System.out.println("archiveDate ===" + archiveDate + " toDate ===="  + toDate);
+                    
+                    if( archiveDate== null || archiveDate.after(toDate))
                     {
                         //issue a warning it does not look normal and skip it
                         logger.warn("Expected PROP_ARCHIVED_DATE on " + fNodeREf + " not null. Node skipped!");
                         fSkip.set(true);
                         return 0; // do not delete it
                     }
+                    
+                    //compare the dates
+                    //System.out.println("Before initial deleteRecursiveInternal!!!" + " archived date:" + archiveDate );
                     return this.deleteRecursiveInternal(fNodeREf, fMaxNumOfNodesInTransaction);
                 }
 
@@ -314,6 +335,10 @@ public class TrashcanCleaner
                         // or specific nodeRef provided in configuration
                         if (!mustBeProtected(nodeRef))
                         {
+                            //System.out.println("Node deleted:" + nodeRef + " has aspect archived: " + nodeService.hasAspect(nodeRef, ContentModel.ASPECT_ARCHIVED) +
+                            //        " Name:" + nodeService.getProperty(nodeRef, ContentModel.PROP_NAME)
+                            // + " date:" + (Date)nodeService.getProperty(nodeRef, ContentModel.PROP_ARCHIVED_DATE));
+                            
                             nodeService.deleteNode(nodeRef);
                             return 1;
                         }
@@ -331,9 +356,15 @@ public class TrashcanCleaner
                     int sum = 0;
                     for (ChildAssociationRef assoc : allChildren)
                     {
+                        //System.out.println("Before deleteRecursiveInternal!!!");
+                        NodeRef parent = assoc.getParentRef();
+                        //System.out.println("Type parent: " + nodeService.getType(parent));
                         sum += deleteRecursiveInternal(assoc.getChildRef(), fMaxNumOfNodesInTransaction);
+                        //System.out.println("After deleteRecursiveInternal Sum = " + sum);
                         if (sum >= fMaxNumOfNodesInTransaction)
+                        {
                             break;
+                        }
                     }
                     return sum;
                 }
@@ -400,7 +431,6 @@ public class TrashcanCleaner
             //start a timer to stop after getCleanerMaxRunningTime();
             stopTask = new TimerTask()
             { 
-
 
                 public void run()
                 {
@@ -470,52 +500,13 @@ public class TrashcanCleaner
         if (this.protectedDays > 0)
         {
             final MutableInteger fToSkip = new MutableInteger(0);
-            
+            final TrashcanCleaner fTrashcanCleaner = this;
             
             final RetryingTransactionCallback<List<NodeRef>> getPage = new RetryingTransactionCallback<List<NodeRef>>()
             {
                 public List<NodeRef> execute() throws Exception
                 {
-
-                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                    // get canned query
-                    //log4j.logger.org.alfresco.trashcan.cleaner.TrashcanCleaner=debug
-                    //log4j.logger.org.alfresco.repo.node.getchildren.GetChildrenCannedQuery=debug
-                    GetChildrenCannedQueryFactory getChildrenCannedQueryFactory = (GetChildrenCannedQueryFactory) cannedQueryRegistry
-                            .getNamedObject(CANNED_QUERY_FILEFOLDER_LIST);
-
-                    List<Pair<QName, Boolean>> sortProps = new ArrayList<Pair<QName, Boolean>>();
-                    sortProps.add(new Pair<QName, Boolean>(ContentModel.PROP_ARCHIVED_DATE, true));
-
-                    Set<QName> assocTypeQNames = new HashSet<QName>(1);
-                    assocTypeQNames.add(ContentModel.ASSOC_CHILDREN);
-
-                    Set<QName> childTypeQNames = new HashSet<QName>(2);
-                    //Other custom types are purged
-                    //childTypeQNames.add(ContentModel.TYPE_CONTENT);
-                    //childTypeQNames.add(ContentModel.TYPE_FOLDER);
-
-                    PagingRequest pagingRequest = new PagingRequest(fToSkip.value, pageLen);
-
-                    GetChildrenCannedQuery cq = (GetChildrenCannedQuery) getChildrenCannedQueryFactory
-                            .getCannedQuery(archiveRoot, "*", assocTypeQNames, childTypeQNames, null, sortProps,
-                                    pagingRequest);
-                    long queryStartExecTime = System.currentTimeMillis();
-                    // execute canned query
-                    CannedQueryResults<NodeRef> results = cq.execute();
-
-                    if (logger.isDebugEnabled())
-                    {
-                        long queryEndExecTime = System.currentTimeMillis();
-                        logger.debug("Query exec time: " + (queryEndExecTime - queryStartExecTime) + "ms");
-                        long getPageCountStart = System.currentTimeMillis();
-                        logger.debug("Number of pages available:" + results.getPageCount());
-                        long getPageCountEnd = System.currentTimeMillis();
-                        logger.debug("getPageCount() exec time:" + (getPageCountEnd - getPageCountStart) + "ms");
-                    }
-
-                    List<NodeRef> pageElements = results.getPage();
-
+                    List<NodeRef> pageElements = fTrashcanCleaner.executeQuery(new StoreRef("archive","SpacesStore"), searchService, ARCHIVE_SEARCH_STRING, fToSkip.value, pageLen);
                     return pageElements;
                 }
                };
@@ -533,25 +524,39 @@ public class TrashcanCleaner
                     logger.debug("iteration =" + iteration);
                 }
                 iteration++;
-                List<NodeRef> pageElements = transactionService.getRetryingTransactionHelper().doInTransaction(getPage, true, true);
+                List<NodeRef> pageElements = transactionService.getRetryingTransactionHelper().doInTransaction(getPage, false, true);
+                //System.out.println("Page element size = " + pageElements.size());
                 if( pageElements.size() == 0 )
                    break;
                 Date toDate = new Date(new Date().getTime() - (1000L * 60L * 60L * 24L * protectedDays));
                 // display the page
                 for (NodeRef nodeRef : pageElements)
                 {
+                    //fToSkip.increment();
                     if( this.getStatus() == Status.STOPPING || this.getStatus() == Status.DISABLED )
                         break;
+                    if (!nodeService.exists(nodeRef))
+                    {
+                        //System.out.println(" ***** Node not exist: " + nodeRef);
+                        continue;
+                    }
                     Date archivedDate = (Date) nodeService
                             .getProperty(nodeRef, ContentModel.PROP_ARCHIVED_DATE);
                     //here we are testing the case if some node are in archive but not having ContentModel.PROP_ARCHIVED_DATE
                     //I also probably mean that the aspect ASPECT_ARCHIVED is not there neither.
                     //Therefore we display a warning when aspect ASPECT_ARCHIVED is not present or PROP_ARCHIVED_DATE
                     //is null. Given that there elements are skipped we do the tests in deleteRecursive(...)
-                    if (archivedDate != null && archivedDate.compareTo(toDate) >= 0)
+                    //* @return  the value <code>0</code> if the argument Date is equal to
+                    //        *          this Date; a value less than <code>0</code> if this Date
+                    //        *          is before the Date argument; and a value greater than
+                    //        *      <code>0</code> if this Date is after the Date argument.
+                    if (archivedDate == null || archivedDate.after(toDate))
                     {
-                        doMore = false;
-                        break;
+                        fToSkip.increment();
+                        //doMore = false;
+                        //break;
+                        //System.out.println("Do nothing! " + archivedDate);
+                        continue;
                     }
                     String name = (String) nodeService.getProperty(nodeRef, ContentModel.PROP_NAME);
                     if (logger.isDebugEnabled())
@@ -564,6 +569,8 @@ public class TrashcanCleaner
                     MutableBoolean fSkipBool = new MutableBoolean(false);
                     while (this.getStatus() != Status.STOPPING && this.getStatus() != Status.DISABLED && deleteRecursive(nodeRef, 500, fSkipBool) != 0)
                     {
+                        //fToSkip.increment();
+                        //System.out.println("Skip: " + fToSkip.value);
                     }
                     // it true we have a tree that was pruned but containing
                     // a node of type that must be preserved
@@ -571,8 +578,9 @@ public class TrashcanCleaner
                     {
                         fToSkip.increment();
                     }
+                    //System.out.println("After Skip: " + fToSkip.value);
                 }
-
+                //System.out.println("Page finished!!!");
                 //doMore = true;
                 
             }
@@ -580,6 +588,35 @@ public class TrashcanCleaner
             
 
         }
+    }
+    
+    private List<NodeRef> executeQuery(
+            StoreRef storeRef,
+            SearchService searchService,
+            String query,
+            int startingElement,
+            int pageLen)
+    {
+
+        SearchParameters sp = new SearchParameters();
+        sp.addStore(storeRef);
+        sp.setLanguage(SearchService.LANGUAGE_FTS_ALFRESCO);
+        sp.setSkipCount(startingElement);
+        // -1 unlimited result size
+        sp.setMaxItems(-1);
+        sp.setQuery(query);
+        ResultSet results = searchService.query(sp);
+        List<NodeRef> nodeToClean = new ArrayList<NodeRef>(pageLen);
+        int i;
+        for (i = startingElement; i < startingElement + pageLen; i++)
+        {
+            if (i - startingElement >= results.length())
+                break;
+            NodeRef nodeRef = results.getNodeRef(i - startingElement);
+            nodeToClean.add(nodeRef);
+        }
+        results.close();
+        return nodeToClean;
     }
 
 }

@@ -3,7 +3,6 @@ package org.alfresco.demoamp.test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -48,7 +47,6 @@ import org.springframework.scheduling.quartz.JobDetailBean;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.google.gdata.data.youtube.YtRelationship.Status;
 import com.tradeshift.test.remote.Remote;
 import com.tradeshift.test.remote.RemoteTestRunner;
 
@@ -68,7 +66,7 @@ public class DemoComponentTest
 {
 
     private static final int NODE_CREATION_BATCH_SIZE = 200;
-    private static final int NUM_OF_DELETED = 10;
+    private static final int NUM_OF_DELETED = 50;
     private static final int NUM_REMAININGS = NODE_CREATION_BATCH_SIZE - NUM_OF_DELETED + 1;
     private static final String CUSTOM_CONTENT_URI = "custom.model";
     private static final QName CUSTOM_CONTENT_MODEL = QName.createQName(CUSTOM_CONTENT_URI, "mycontent");
@@ -144,7 +142,7 @@ public class DemoComponentTest
         assertNotNull(serviceRegistry);
         InsureBinEmpty();
         HashSet<NodeRef> nodesInTheBin = populateBin(null, null, null);
-        System.out.println("******* nodesInTheBin = " + nodesInTheBin.size());
+        //System.out.println("******* nodesInTheBin = " + nodesInTheBin.size());
         StringBuffer sb = new StringBuffer();
         int i = 0;
         int numToDel = 0;
@@ -169,8 +167,8 @@ public class DemoComponentTest
             }
             i++;
         }
-        System.out.println("******* sb.toString() = " + sb.toString());
-        System.out.println("******* numToDel = " + numToDel);
+        //System.out.println("******* sb.toString() = " + sb.toString());
+        //System.out.println("******* numToDel = " + numToDel);
         trashcanCleaner.setNodesToSkip(sb.toString());
         final int fnumToDel = numToDel;
         // PopulateBin(null);
@@ -186,8 +184,8 @@ public class DemoComponentTest
                     trashcanCleaner.execute();
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
                     // none should be delete because they are all sites
-                    System.out.println("******* childAssocs.size()-fnumToDel = " + (childAssocs.size() - fnumToDel));
-                    System.out.println("******* childAssocAfter.size() = " + childAssocAfter.size());
+                    //System.out.println("******* childAssocs.size()-fnumToDel = " + (childAssocs.size() - fnumToDel));
+                    //System.out.println("******* childAssocAfter.size() = " + childAssocAfter.size());
                     assertTrue(childAssocs.size() - fnumToDel <= childAssocAfter.size());
                     return null;
                 }
@@ -218,10 +216,10 @@ public class DemoComponentTest
                     // test if purge deleted all the elements from the bin
                     trashcanCleaner.execute();
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
-                    System.out.println("-----------------BEFORE:" + childAssocs.size());
-                    System.out.println("-----------------AFTER:" + childAssocs.size());
+                    //System.out.println("-----------------BEFORE:" + childAssocs.size());
+                    //System.out.println("-----------------AFTER:" + childAssocAfter.size());
                     // none should be delete because they are all sites
-                    assertEquals(childAssocs.size(), childAssocAfter.size());
+                    assertEquals(childAssocs.size() - NUM_OF_DELETED + 10, childAssocAfter.size());
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -275,7 +273,7 @@ public class DemoComponentTest
                 }
             }, AuthenticationUtil.getSystemUserName());
         PopulateBinWithBigTree(secParent);
-        System.out.println("After PopulateBinWithBigTree!");
+        //System.out.println("After PopulateBinWithBigTree!");
         if (directExecute)
         {
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
@@ -313,7 +311,7 @@ public class DemoComponentTest
                 Scheduler scheduler = new StdSchedulerFactory().getScheduler();
                 scheduler.start();
                 scheduler.scheduleJob(trashcanCleanerJobDetail, trigger);
-                System.out.println("Before starting !!!");
+                //System.out.println("Before starting !!!");
                 // wait
                 try
                 {
@@ -328,8 +326,8 @@ public class DemoComponentTest
 
                 do
                 {
-                    System.out.println(
-                            "*********************************************************************Before SLEEP");
+                    //System.out.println(
+                    //        "*********************************************************************Before SLEEP");
                     try
                     {
                         Thread.sleep(4000L);
@@ -339,7 +337,7 @@ public class DemoComponentTest
                     }
                 }
                 while (trashcanCleaner.getStatus() == TrashcanCleaner.Status.RUNNING);
-                System.out.println("*********************************************************************Finished");
+                //System.out.println("*********************************************************************Finished");
                 AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                     {
                         public Object doWork() throws Exception
@@ -364,7 +362,7 @@ public class DemoComponentTest
                 e.printStackTrace();
             }
         }
-        System.out.println("*********************************************************************VERIFIED");
+        //System.out.println("*********************************************************************VERIFIED");
 
     }
 
@@ -381,7 +379,7 @@ public class DemoComponentTest
         InsureBinEmpty();
 
         PopulateBinWithBigTree(null);
-        System.out.println("After PopulateBinWithBigTree!");
+        //System.out.println("After PopulateBinWithBigTree!");
 
         try
         {
@@ -397,7 +395,7 @@ public class DemoComponentTest
             Scheduler scheduler = new StdSchedulerFactory().getScheduler();
             scheduler.start();
             scheduler.scheduleJob(trashcanCleanerJobDetail, trigger);
-            System.out.println("Before starting !!!");
+            //System.out.println("Before starting !!!");
             // wait
             try
             {
@@ -412,7 +410,7 @@ public class DemoComponentTest
             TrashcanCleaner.Status prevStatus = trashcanCleaner.Disable();
             assert (trashcanCleaner.getStatus() == TrashcanCleaner.Status.DISABLED);
 
-            System.out.println("*********************************************************************Before SLEEP");
+            //System.out.println("*********************************************************************Before SLEEP");
             try
             {
                 Thread.sleep(4000L);
@@ -426,7 +424,7 @@ public class DemoComponentTest
             populateBin(null, null, null);
             populateBin(null, null, null);
             populateBin(null, null, null);
-            System.out.println("*********************************************************************Finished");
+            //System.out.println("*********************************************************************Finished");
             //check that it does nothing still disabled.
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
@@ -460,7 +458,7 @@ public class DemoComponentTest
             trashcanCleaner.Enable();
         }
 
-        System.out.println("*********************************************************************VERIFIED");
+        //System.out.println("*********************************************************************VERIFIED");
 
     }
 
@@ -472,7 +470,8 @@ public class DemoComponentTest
     {
         assertNotNull(serviceRegistry);
         HashSet<String> typeToProtect = new HashSet<String>();
-        trashcanCleaner.setSetToProtect(typeToProtect);
+        typeToProtect.add("{http://www.alfresco.org/model/site/1.0}site");
+        typeToProtect.add("{http://www.alfresco.org/model/system/1.0}archiveUser");
         // empty the bin
         InsureBinEmpty();
         NodeRef secParent = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
@@ -497,7 +496,33 @@ public class DemoComponentTest
                 }
             }, AuthenticationUtil.getSystemUserName());
         PopulateBinWithBigTree(secParent);
-        System.out.println("After PopulateBinWithBigTree!");
+
+       // List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+        
+        final NodeRef archiveRoot = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<NodeRef>()
+        {
+            public NodeRef doWork() throws Exception
+            {
+                // try to count number of elements in the bin
+                StoreRef storeRef = new StoreRef("archive://SpacesStore");      
+                return nodeService.getRootNode(storeRef);
+                
+            }
+        }, AuthenticationUtil.getSystemUserName());
+        
+        List<ChildAssociationRef> childAssocs = AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<List<ChildAssociationRef>>()
+        {
+            public List<ChildAssociationRef> doWork() throws Exception
+            {
+                // try to count number of elements in the bin
+                StoreRef storeRef = new StoreRef("archive://SpacesStore");      
+                return nodeService.getChildAssocs(archiveRoot);
+                
+            }
+        }, AuthenticationUtil.getSystemUserName());
+        
+        
+        //System.out.println("After PopulateBinWithBigTree, number of elements in the bin: " + childAssocs );
 
         try
         {
@@ -522,7 +547,7 @@ public class DemoComponentTest
             {
             }
 
-            System.out.println("Before starting !!!");
+            //System.out.println("Before starting !!!");
 
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
@@ -549,7 +574,7 @@ public class DemoComponentTest
 
             do
             {
-                System.out.println("*********************************************************************Before SLEEP");
+                //System.out.println("*********************************************************************Before SLEEP");
                 try
                 {
                     Thread.sleep(4000L);
@@ -559,7 +584,7 @@ public class DemoComponentTest
                 }
             }
             while (trashcanCleaner.getStatus() == TrashcanCleaner.Status.RUNNING);
-            System.out.println("*********************************************************************Finished");
+            //System.out.println("*********************************************************************Finished");
             AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
                 {
                     public Object doWork() throws Exception
@@ -568,10 +593,7 @@ public class DemoComponentTest
                         StoreRef storeRef = new StoreRef("archive://SpacesStore");
                         NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                         List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
-
-                        childAssocs = nodeService.getChildAssocs(archiveRoot);
-
-                        assertEquals(childAssocs.size(), NUM_REMAININGS);
+                        assertEquals( NUM_REMAININGS, childAssocs.size());
                         return null;
                     }
                 }, AuthenticationUtil.getSystemUserName());
@@ -583,7 +605,7 @@ public class DemoComponentTest
             // fail(e.getMessage());
             e.printStackTrace();
         }
-        System.out.println("*********************************************************************VERIFIED");
+        //System.out.println("*********************************************************************VERIFIED");
     }
 
     @Test
@@ -591,6 +613,8 @@ public class DemoComponentTest
     {
         assertNotNull(serviceRegistry);
         HashSet<String> typeToProtect = new HashSet<String>();
+        typeToProtect.add("{http://www.alfresco.org/model/site/1.0}site");
+        typeToProtect.add("{http://www.alfresco.org/model/system/1.0}archiveUser");
         trashcanCleaner.setSetToProtect(typeToProtect);
         // empty the bin
         InsureBinEmpty();
@@ -678,10 +702,14 @@ public class DemoComponentTest
 
                         // test if purge deleted all the elements from the
                         // bin
+                        HashSet<String> typeToProtect = new HashSet<String>();
+                        typeToProtect.add("{http://www.alfresco.org/model/site/1.0}site");
+                        typeToProtect.add("{http://www.alfresco.org/model/system/1.0}archiveUser");
+                        trashcanCleaner.setSetToProtect(typeToProtect);
                         trashcanCleaner.execute();
                         childAssocs = nodeService.getChildAssocs(archiveRoot);
 
-                        assertEquals(childAssocs.size(), NUM_REMAININGS);
+                        assertEquals( NUM_REMAININGS, childAssocs.size());
                         return null;
                     }
                 }, AuthenticationUtil.getSystemUserName());
@@ -696,6 +724,7 @@ public class DemoComponentTest
         // empty the bin
         InsureBinEmpty();
         populateBin(null, CUSTOM_CONTENT_MODEL, CUSTOM_FOLDER_MODEL);
+        //populateBin(null, null, null);
         AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
             {
                 public Object doWork() throws Exception
@@ -705,10 +734,15 @@ public class DemoComponentTest
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
                     // test if purge deleted all the elements from the bin
-                    System.out.println("**** Child Assoc Before: " + childAssocs.size());
+                    //System.out.println("**** Child Assoc Before: " + childAssocs.size());
+                    // configure type to protest
+                    HashSet<String> typeToProtect = new HashSet<String>();
+                    typeToProtect.add("{http://www.alfresco.org/model/site/1.0}site");
+                    typeToProtect.add("{http://www.alfresco.org/model/system/1.0}archiveUser");
+                    trashcanCleaner.setSetToProtect(typeToProtect);
                     trashcanCleaner.execute();
                     List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
-                    System.out.println("**** Child Assoc Before: " + childAssocAfter.size());
+                    //System.out.println("**** Child Assoc after : " + childAssocAfter.size());
                     // Should all be deleted because not custom type
                     assertEquals(childAssocs.size() - NUM_OF_DELETED, childAssocAfter.size());
                     return null;
@@ -716,6 +750,48 @@ public class DemoComponentTest
             }, AuthenticationUtil.getSystemUserName());
 
     }
+    
+    @Test
+    public void testSimple()
+    {
+        assertNotNull(serviceRegistry);
+        // empty the bin
+        InsureBinEmpty();
+        populateBin(null, null, null);
+        //populateBin(null, null, null);
+        // try to count number of elements in the bin
+
+        AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<Object>()
+            {
+                public Object doWork() throws Exception
+                {
+                    StoreRef storeRef = new StoreRef("archive://SpacesStore");
+                    NodeRef archiveRoot = nodeService.getRootNode(storeRef);
+                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    // test if purge deleted all the elements from the bin
+                    //System.out.println("**** Child Assoc Before: " + childAssocs.size());
+                    trashcanCleaner.setPageLen(5);
+                    trashcanCleaner.execute();
+                    // Should all be deleted because not custom type
+                    //if ( childAssocs == null )
+                    //    System.out.println("childAssocs IS NLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL");
+                    //System.out.println("**** Child Assoc Before: " + childAssocs.size());
+                    List<ChildAssociationRef> childAssocAfter = nodeService.getChildAssocs(archiveRoot);
+                    
+                    //if ( childAssocAfter == null )
+                     //   System.out.println("childAssocAfter IS NLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL");
+                   //System.out.println("**** Child Assoc After: " + childAssocAfter.size());
+                    assertEquals(childAssocs.size() - NUM_OF_DELETED, childAssocAfter.size());
+                    return null;
+
+                }
+            }, AuthenticationUtil.getSystemUserName());
+
+
+
+
+    }
+
 
     protected void PopulateBinWithBigTree(NodeRef secondParent)
     {
@@ -864,10 +940,14 @@ public class DemoComponentTest
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
                     List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
                     int i = 0;
+                    //policyBehaviourFilter.disableBehaviour( ContentModel.ASPECT_ARCHIVED);
                     for (ChildAssociationRef childAssoc : childAssocs)
                     {
                         if (i > NUM_OF_DELETED)
+                        {
+                            //System.out.println("Ofsetting:" + i);
                             break;
+                        }
                         i++;
                         Calendar cal = Calendar.getInstance();
                         cal.set(Calendar.YEAR, 1974);
@@ -879,14 +959,22 @@ public class DemoComponentTest
                         cal.set(Calendar.MILLISECOND, 0);
 
                         Date d = cal.getTime();
-                        policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
+
                         try
                         {
+                            //System.out.println("Is enabled before: " +  policyBehaviourFilter.isEnabled(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED));
+                            policyBehaviourFilter.disableBehaviour( childAssoc.getChildRef(),ContentModel.ASPECT_ARCHIVED);
+                            //System.out.println("Is enabled before 2: " +  policyBehaviourFilter.isEnabled(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED));
+
+                            //System.out.println("***********************  Offset: " + childAssoc.getChildRef() );
                             nodeService.setProperty(childAssoc.getChildRef(), ContentModel.PROP_ARCHIVED_DATE, d);
+                            policyBehaviourFilter.enableBehaviour( childAssoc.getChildRef(),ContentModel.ASPECT_ARCHIVED);
+                            //System.out.println("Is enabled before 3: " +  policyBehaviourFilter.isEnabled(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED));
                         }
                         finally
                         {
-                            policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                            policyBehaviourFilter.enableBehaviour(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED);
+                            //System.out.println("Is enabled before 4: " +  policyBehaviourFilter.isEnabled(childAssoc.getChildRef(), ContentModel.ASPECT_ARCHIVED));
                         }
 
                         fNodeSet.add(childAssoc.getChildRef());
@@ -901,7 +989,7 @@ public class DemoComponentTest
                 public HashSet<NodeRef> doWork() throws Exception
                 {
                     return (HashSet<NodeRef>) fTransactionService.getRetryingTransactionHelper()
-                            .doInTransaction(getArchivedNodeDateOffseted);
+                            .doInTransaction(getArchivedNodeDateOffseted, false, true);
                 }
             }, AuthenticationUtil.getSystemUserName());
     }
@@ -971,7 +1059,7 @@ public class DemoComponentTest
             {
                 public Object doWork() throws Exception
                 {
-                    fTransactionService.getRetryingTransactionHelper().doInTransaction(emptyBinWork);
+                    fTransactionService.getRetryingTransactionHelper().doInTransaction(emptyBinWork, false, true);
                     return null;
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -1216,7 +1304,7 @@ public class DemoComponentTest
                 public List<NodeRef> doWork() throws Exception
                 {
                     return (List<NodeRef>) fTransactionService.getRetryingTransactionHelper()
-                            .doInTransaction(populateBinWork);
+                            .doInTransaction(populateBinWork,false, true);
 
                 }
             }, AuthenticationUtil.getSystemUserName());
@@ -1238,7 +1326,7 @@ public class DemoComponentTest
             {
                 public Object doWork() throws Exception
                 {
-                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(deleteWork);
+                    return (Object) fTransactionService.getRetryingTransactionHelper().doInTransaction(deleteWork,false, true);
 
                 }
             }, AuthenticationUtil.getSystemUserName());
