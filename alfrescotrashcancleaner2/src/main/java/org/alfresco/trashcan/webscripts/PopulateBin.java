@@ -79,10 +79,16 @@ public class PopulateBin extends AbstractWebScript
     @Override
     public void execute(WebScriptRequest req, WebScriptResponse res) throws IOException
     {
+            boolean offset = true;
             JSONObject jResult = new JSONObject();
+            String sOffset = req.getParameter("offset");
+            if( sOffset != null && sOffset.equals("false"))
+            {
+                offset = false;
+            }
             try
             {
-                Set<NodeRef> nodes = populateBin(null, null, null);
+                Set<NodeRef> nodes = populateBin(null, null, null, offset);
                 jResult.put("GEN", nodes.size());
             }
             catch (JSONException e1)
@@ -92,8 +98,17 @@ public class PopulateBin extends AbstractWebScript
             res.getWriter().write(jResult.toString());        
     }
     
-    protected HashSet<NodeRef> populateBin(NodeRef secondParent, QName customContentType, QName customFolderType)
+    /**
+     * 
+     * @param secondParent
+     * @param customContentType
+     * @param customFolderType
+     * @param offset if true archive date will be changed to 28-04-1974
+     * @return
+     */
+    protected HashSet<NodeRef> populateBin(NodeRef secondParent, QName customContentType, QName customFolderType, boolean offset)
     {
+        final boolean fOffset = offset;
         final NodeRef fSecondParent = secondParent;
         final QName fCustomContentType = customContentType;
 
@@ -192,21 +207,23 @@ public class PopulateBin extends AbstractWebScript
 
         // modify the {http://www.alfresco.org/model/system/1.0}archivedDate or
         // sys:archivedDate
-
-        return AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<HashSet<NodeRef>>()
+        
+            return AuthenticationUtil.runAs(new AuthenticationUtil.RunAsWork<HashSet<NodeRef>>()
             {
                 public HashSet<NodeRef> doWork() throws Exception
                 {
-                    return offsetNodesInBin(fTransactionService, batchOfnodes);
+                    return offsetNodesInBin(fTransactionService, batchOfnodes, fOffset);
 
                 }
             }, AuthenticationUtil.getSystemUserName());
+       
 
     }
     
-    protected HashSet<NodeRef> offsetNodesInBin(TransactionService transactionService, List<NodeRef> batchOfnodes )
+    protected HashSet<NodeRef> offsetNodesInBin(TransactionService transactionService, List<NodeRef> batchOfnodes, boolean offset )
     {
 
+        final boolean fOffset = offset;
         final TransactionService fTransactionService = transactionService;
         final List<NodeRef> fBatchOfnodes = batchOfnodes;
         final RetryingTransactionCallback<HashSet<NodeRef>> getArchivedNodeDateOffseted = new RetryingTransactionCallback<HashSet<NodeRef>>()
@@ -216,40 +233,41 @@ public class PopulateBin extends AbstractWebScript
                     HashSet<NodeRef> fNodeSet = new HashSet<NodeRef>();
                     StoreRef storeRef = new StoreRef("archive://SpacesStore");
                     NodeRef archiveRoot = nodeService.getRootNode(storeRef);
-                    List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
+                    //List<ChildAssociationRef> childAssocs = nodeService.getChildAssocs(archiveRoot);
                     int i = 0;
                     for (NodeRef nodeRef : fBatchOfnodes)
                     {
 
                         i++;
-                        Calendar cal = Calendar.getInstance();
-                        cal.set(Calendar.YEAR, 1974);
-                        cal.set(Calendar.MONTH, 4);
-                        cal.set(Calendar.DAY_OF_MONTH, 28);
-                        cal.set(Calendar.HOUR_OF_DAY, 17);
-                        cal.set(Calendar.MINUTE, 30);
-                        cal.set(Calendar.SECOND, 0);
-                        cal.set(Calendar.MILLISECOND, 0);
-
-                        Date d = cal.getTime();
-                        
                         //The node in the bin has same uuid
                         NodeRef archivedNodeRef = new NodeRef("archive", "SpacesStore", nodeRef.getId());
-                        
-                        policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                        try
+                        if (fOffset)
                         {
-                            nodeService.setProperty(archivedNodeRef, ContentModel.PROP_ARCHIVED_DATE, d);
+                            Calendar cal = Calendar.getInstance();
+                            cal.set(Calendar.YEAR, 1974);
+                            cal.set(Calendar.MONTH, 4);
+                            cal.set(Calendar.DAY_OF_MONTH, 28);
+                            cal.set(Calendar.HOUR_OF_DAY, 17);
+                            cal.set(Calendar.MINUTE, 30);
+                            cal.set(Calendar.SECOND, 0);
+                            cal.set(Calendar.MILLISECOND, 0);
+    
+                            Date d = cal.getTime();
+                            
+    
+                            
+                            policyBehaviourFilter.disableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                            try
+                            {
+                                nodeService.setProperty(archivedNodeRef, ContentModel.PROP_ARCHIVED_DATE, d);
+                            }
+                            finally
+                            {
+                                policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
+                            }
                         }
-                        finally
-                        {
-                            policyBehaviourFilter.enableBehaviour(ContentModel.ASPECT_ARCHIVED);
-                        }
-
                         fNodeSet.add(archivedNodeRef);
-
                     }
-
                     return fNodeSet;
                 }
             };

@@ -386,7 +386,7 @@ public class TrashcanCleaner
         {
             if (logger.isDebugEnabled())
             {
-                logger.debug("Trashcan RUNNING or DISABLET: " + this.getStatus());
+                logger.debug("Trashcan RUNNING or DISABLED: " + this.getStatus());
             }
             return;
         }
