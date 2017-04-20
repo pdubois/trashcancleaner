@@ -1,9 +1,0 @@
-<webscript>
-  <shortname>enable</shortname>
-  <description>Disable trashcan</description>
-  <url>/trashcan/enable</url>
-  <authentication>admin</authentication>
-  <transaction>required</transaction>
-  <format default="">argument</format>
-  <family>Alfresco Java-Backed WebScripts enabling</family>
-</webscript>

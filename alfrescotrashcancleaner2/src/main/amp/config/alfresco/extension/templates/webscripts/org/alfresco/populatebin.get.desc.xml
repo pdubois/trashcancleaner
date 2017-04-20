@@ -1,9 +1,0 @@
-<webscript>
-  <shortname>populatebin</shortname>
-  <description>populatebin</description>
-  <url>/trashcan/populatebin</url>
-  <authentication>admin</authentication>
-  <transaction>required</transaction>
-  <format default="">argument</format>
-  <family>Alfresco Java-Backed WebScripts populate bin</family>
-</webscript>
