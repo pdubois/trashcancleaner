@@ -370,6 +370,11 @@ public class TrashcanCleaner
                 }
 
             };
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("****** In delete recursive : " + nodeRef);
+            };
+        //System.out.println("****** In delete recursive : " + nodeRef);
         return transactionService.getRetryingTransactionHelper().doInTransaction(recursiveWork, false,
                 true);
     }
@@ -525,6 +530,12 @@ public class TrashcanCleaner
                 }
                 iteration++;
                 List<NodeRef> pageElements = transactionService.getRetryingTransactionHelper().doInTransaction(getPage, false, true);
+                
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("*********** WILL CHECK : " + pageElements.size() + " ROOT NODES IN THE BIN!!!");
+                };
+                
                 //System.out.println("Page element size = " + pageElements.size());
                 if( pageElements.size() == 0 )
                    break;
@@ -532,6 +543,11 @@ public class TrashcanCleaner
                 // display the page
                 for (NodeRef nodeRef : pageElements)
                 {
+                    if (logger.isDebugEnabled())
+                    {
+                        logger.debug("*********** Node : " + nodeRef);
+                    };
+                    //System.out.println(" *********** Node : " + nodeRef);
                     //fToSkip.increment();
                     if( this.getStatus() == Status.STOPPING || this.getStatus() == Status.DISABLED )
                         break;
@@ -553,6 +569,11 @@ public class TrashcanCleaner
                     if (archivedDate == null || archivedDate.after(toDate))
                     {
                         fToSkip.increment();
+                        if (logger.isDebugEnabled())
+                        {
+                            logger.debug("*********** Skip : " + nodeRef);
+                        };
+                        //System.out.println(" *********** Skip : " + nodeRef);
                         //doMore = false;
                         //break;
                         //System.out.println("Do nothing! " + archivedDate);
@@ -578,10 +599,18 @@ public class TrashcanCleaner
                     {
                         fToSkip.increment();
                     }
-                    //System.out.println("After Skip: " + fToSkip.value);
+                    if (logger.isDebugEnabled())
+                    {
+                        logger.debug("****************After Skip: " + fToSkip.value);
+                    }
+                    //System.out.println("****************After Skip: " + fToSkip.value);
+                }
+                if (logger.isDebugEnabled())
+                {
+                    logger.debug("**************** Page finished!!! DOING ONLY ONE BIG PAGE FOR THE getChildren() CHANGE ");
                 }
                 //System.out.println("Page finished!!!");
-                //doMore = true;
+                doMore = false; //STOP HERE do only 1 page THIS IS FOR THE getChildren() CHANGE.
                 
             }
             while (doMore == true);
@@ -598,25 +627,35 @@ public class TrashcanCleaner
             int pageLen)
     {
 
-        SearchParameters sp = new SearchParameters();
-        sp.addStore(storeRef);
-        sp.setLanguage(SearchService.LANGUAGE_FTS_ALFRESCO);
-        sp.setSkipCount(startingElement);
-        // -1 unlimited result size
-        sp.setMaxItems(-1);
-        sp.setQuery(query);
-        ResultSet results = searchService.query(sp);
-        List<NodeRef> nodeToClean = new ArrayList<NodeRef>(pageLen);
-        int i;
-        for (i = startingElement; i < startingElement + pageLen; i++)
-        {
-            if (i - startingElement >= results.length())
-                break;
-            NodeRef nodeRef = results.getNodeRef(i - startingElement);
-            nodeToClean.add(nodeRef);
-        }
-        results.close();
-        return nodeToClean;
+          NodeRef rootNode = nodeService.getRootNode(storeRef);
+          List<ChildAssociationRef> children = nodeService.getChildAssocs(rootNode);
+          
+          List<NodeRef> nodeToClean = new ArrayList(children.size());
+          
+          for(ChildAssociationRef assoc: children)
+          {
+              nodeToClean.add(assoc.getChildRef());
+          }
+          return nodeToClean;
+//        SearchParameters sp = new SearchParameters();
+//        sp.addStore(storeRef);
+//        sp.setLanguage(SearchService.LANGUAGE_FTS_ALFRESCO);
+//        sp.setSkipCount(startingElement);
+//        // -1 unlimited result size
+//        sp.setMaxItems(-1);
+//        sp.setQuery(query);
+//        ResultSet results = searchService.query(sp);
+//        List<NodeRef> nodeToClean = new ArrayList<NodeRef>(pageLen);
+//        int i;
+//        for (i = startingElement; i < startingElement + pageLen; i++)
+//        {
+//            if (i - startingElement >= results.length())
+//                break;
+//            NodeRef nodeRef = results.getNodeRef(i - startingElement);
+//            nodeToClean.add(nodeRef);
+//        }
+//        results.close();
+//        return nodeToClean;
     }
 
 }
