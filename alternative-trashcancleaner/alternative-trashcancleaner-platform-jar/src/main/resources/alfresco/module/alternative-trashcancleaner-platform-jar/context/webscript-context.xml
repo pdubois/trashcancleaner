@@ -23,4 +23,42 @@
 		  class="alternative.trashcancleaner.platformsample.HelloWorldWebScript"
 		  parent="webscript">
 	</bean>
+	
+	   <bean id="webscript.org.alfresco.getstatus.get" class="alternative.trashcancleaner.platformsample.GetStatus"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+    </bean>
+    
+    <bean id="webscript.org.alfresco.disable.get" class="alternative.trashcancleaner.platformsample.Disable"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+    </bean>
+    
+    <bean id="webscript.org.alfresco.enable.get" class="alternative.trashcancleaner.platformsample.Enable"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+    </bean>
+    
+    <bean id="webscript.org.alfresco.populatebin.get" class="alternative.trashcancleaner.platformsample.PopulateBin"
+        parent="webscript">
+        <property name="trashcanCleaner">
+            <ref bean="trashcanCleaner" />
+        </property>
+        <property name="nodeService">
+            <ref bean="nodeService" />
+        </property>
+        <property name="serviceRegistry">
+            <ref bean="ServiceRegistry" />
+        </property>
+        <property name="policyBehaviourFilter">
+            <ref bean="policyBehaviourFilter" />
+        </property>
+    </bean>
+	
 </beans>

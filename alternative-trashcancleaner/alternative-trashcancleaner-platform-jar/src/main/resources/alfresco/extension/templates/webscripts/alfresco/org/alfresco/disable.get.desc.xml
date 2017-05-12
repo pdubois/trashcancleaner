@@ -1,0 +1,9 @@
+<webscript>
+  <shortname>disable</shortname>
+  <description>Disable trashcan</description>
+  <url>/trashcan/disable</url>
+  <authentication>admin</authentication>
+  <transaction>required</transaction>
+  <format default="">argument</format>
+  <family>Alfresco Java-Backed WebScripts disabling</family>
+</webscript>

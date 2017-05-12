@@ -36,6 +36,68 @@
         <property name="nodeService" ref="NodeService" />
         <property name="nodeLocatorService" ref="nodeLocatorService" />
     </bean>
+    
+    <bean id="trashcanCleaner" class="alternative.trashcancleaner.platformsample.TrashcanCleaner">
+        <property name="nodeService">
+            <ref bean="nodeService" />
+        </property>
+        <property name="transactionService">
+            <ref bean="TransactionService" />
+        </property>
+        <property name="protectedDays">
+            <value>${alt.trashcan.cleaner.protected.day}</value>
+        </property>
+        <property name="dictionaryService">
+            <ref bean="DictionaryService" />
+        </property>
+        <property name="jobLockService">
+            <ref bean="jobLockService" />
+        </property>
+        <property name="searchService">
+            <ref bean="searchService" />
+        </property>
+        <property name="pageLen" value="${alt.trashcan.cleaner.pagelen}" />
+        <!-- Set of type that must be protected from deletetion -->
+        <!-- results in a setAddressSet(java.util.Set) call -->
+        <property name="setToProtect">
+            <set>
+                <!-- Example: QName of type to protect -->
+                <!-- value>{http://www.alfresco.org/model/site/1.0}site</value -->
+                <!-- THIS TYPE MUSE ALWAYS BE PROTECTED: {http://www.alfresco.org/model/system/1.0}archiveUser -->
+                <value>{http://www.alfresco.org/model/system/1.0}archiveUser</value>
+            </set>
+        </property>
+        <property name="nodesToSkip">
+            <value>${alt.trashcan.cleaner.nodestoskip}</value>
+        </property>
+        <property name="cleanerMaxRunningTime">
+            <value>${alt.trashcan.cleaner.cleanermaxrunningtime}</value>
+        </property>
+    </bean>
+    
+    <bean id="trashcanCleanerJobDetail" class="org.springframework.scheduling.quartz.JobDetailBean">
+        <property name="jobClass">
+            <value>alternative.trashcancleaner.platformsample.TrashcanCleanerJob</value>
+        </property>
+        <property name="jobDataAsMap">
+            <map>
+                <entry key="trashcanCleaner">
+                    <ref bean="trashcanCleaner" />
+                </entry>
+            </map>
+        </property>
+    </bean>
 
+    <bean id="trashcanCleanerTrigger" class="org.alfresco.util.CronTriggerBean">
+        <property name="jobDetail">
+            <ref bean="trashcanCleanerJobDetail" />
+        </property>
+        <property name="scheduler">
+            <ref bean="schedulerFactory" />
+        </property>
+        <property name="cronExpression">
+            <value>${alt.trashcan.cleaner.cron}</value>
+        </property>
+    </bean>
 
 </beans>
