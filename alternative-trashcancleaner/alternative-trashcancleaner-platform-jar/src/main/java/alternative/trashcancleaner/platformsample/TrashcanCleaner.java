@@ -19,6 +19,7 @@ import org.alfresco.service.cmr.repository.ChildAssociationRef;
 import org.alfresco.service.cmr.repository.NodeRef;
 import org.alfresco.service.cmr.repository.NodeService;
 import org.alfresco.service.cmr.repository.StoreRef;
+import org.alfresco.service.cmr.search.QueryConsistency;
 import org.alfresco.service.cmr.search.ResultSet;
 import org.alfresco.service.cmr.search.SearchParameters;
 import org.alfresco.service.cmr.search.SearchService;
@@ -604,6 +605,7 @@ public class TrashcanCleaner
         SearchParameters sp = new SearchParameters();
         sp.addStore(storeRef);
         sp.setLanguage(SearchService.LANGUAGE_FTS_ALFRESCO);
+        sp.setQueryConsistency(QueryConsistency.TRANSACTIONAL);
         sp.setSkipCount(startingElement);
         System.out.println("///////////////////////////////////////////////////////////////////**************** ContentModel.PROP_ARCHIVED_DATE.toPrefixString() " + ContentModel.PROP_ARCHIVED_DATE.toPrefixString());
         sp.addSort(ContentModel.PROP_ARCHIVED_DATE.toString(), true);
